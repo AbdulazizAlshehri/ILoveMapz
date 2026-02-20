@@ -1,0 +1,478 @@
+/* KMZ Field Auditor — Specific Styles */
+/* Core map/layout styles are in ../kmz_core.css */
+
+/* ── RIGHT: Audit Panel — always visible ─────────────────────── */
+#audit-panel {
+    width: 290px;
+    min-width: 290px;
+    background: #f8f9fa;
+    border-left: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    z-index: 500;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#audit-panel::-webkit-scrollbar {
+    width: 4px;
+}
+
+#audit-panel::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 4px;
+}
+
+/* ── Section base ────────────────────────────────────────────── */
+.audit-section {
+    background: white;
+    border-bottom: 1px solid #ebebeb;
+    padding: 12px 14px;
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ── Config Section ──────────────────────────────────────────── */
+.config-section {
+    padding: 12px 14px 14px;
+}
+
+.config-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.config-row:last-child {
+    margin-bottom: 0;
+}
+
+.config-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 90px;
+    flex-shrink: 0;
+}
+
+.config-select,
+.config-input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 8px;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    color: #2c3e50;
+    outline: none;
+    background: white;
+    transition: border-color 0.15s;
+}
+
+.config-select:focus,
+.config-input:focus {
+    border-color: var(--color-primary);
+}
+
+.config-select:disabled {
+    background: #f8f8f8;
+    color: #aaa;
+}
+
+.config-file-row {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.config-file-name {
+    flex: 1;
+    font-size: 11px;
+    color: #aaa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.config-file-name.loaded {
+    color: #27ae60;
+    font-weight: 600;
+}
+
+.btn-config-file {
+    background: #f0f0f0;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 8px;
+    cursor: pointer;
+    color: #666;
+    font-size: 12px;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.btn-config-file:hover {
+    background: #e5e5e5;
+}
+
+/* ── Progress Section ────────────────────────────────────────── */
+.progress-section {
+    padding: 14px 14px 12px;
+}
+
+.progress-counter {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.prog-num {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--color-primary);
+    line-height: 1;
+}
+
+.prog-sep {
+    font-size: 22px;
+    color: #ccc;
+    font-weight: 300;
+}
+
+.prog-total {
+    font-size: 22px;
+    font-weight: 600;
+    color: #bbb;
+}
+
+.prog-label {
+    font-size: 12px;
+    color: #bbb;
+    margin-left: 4px;
+    align-self: center;
+}
+
+.progress-bar-track {
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 4px;
+    transition: width 0.35s ease;
+}
+
+.progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #aaa;
+}
+
+.prog-pct {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.prog-annotated {
+    color: #aaa;
+}
+
+/* ── Row Section ─────────────────────────────────────────────── */
+.row-section {
+    padding: 12px 14px;
+}
+
+.row-id-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.row-id-badge {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2c3e50;
+    background: #f0f0f0;
+    padding: 3px 10px;
+    border-radius: 20px;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.match-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.match-status.found {
+    background: #e8f8f0;
+    color: #27ae60;
+}
+
+.match-status.missing {
+    background: #fff3e0;
+    color: #e67e22;
+}
+
+.match-status.no-excel {
+    background: #f5f5f5;
+    color: #aaa;
+}
+
+.row-extra-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.extra-field {
+    font-size: 11px;
+    color: #888;
+    display: flex;
+    gap: 5px;
+}
+
+.extra-field .ef-key {
+    color: #aaa;
+    min-width: 60px;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.extra-field .ef-val {
+    color: #555;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Not-found banner */
+.not-found-banner {
+    margin-top: 8px;
+    padding: 7px 10px;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #b8860b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.not-found-banner.hidden {
+    display: none;
+}
+
+/* ── Note Section ────────────────────────────────────────────── */
+.note-section {
+    padding: 12px 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.note-col-tag {
+    font-size: 10px;
+    font-weight: 400;
+    color: #bbb;
+    background: #f5f5f5;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+}
+
+.audit-textarea {
+    flex: 1;
+    width: 100%;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    resize: none;
+    outline: none;
+    color: #2c3e50;
+    transition: border-color 0.15s;
+    min-height: 90px;
+}
+
+.audit-textarea:focus {
+    border-color: var(--color-primary);
+}
+
+/* ── Stats Section ───────────────────────────────────────────── */
+.stats-section {
+    padding: 12px 14px;
+}
+
+.stats-total-badge {
+    font-size: 11px;
+    color: #aaa;
+    margin-left: 4px;
+    font-weight: 600;
+}
+
+.stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stats-empty {
+    font-size: 11px;
+    color: #ccc;
+    font-style: italic;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #555;
+    background: #fdfdfd;
+    border: 1px solid #f0f0f0;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.stat-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+    font-weight: 500;
+}
+
+.stat-badge {
+    background: #f0f0f0;
+    color: #666;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* ── Navigation Section ──────────────────────────────────────── */
+.audit-nav-section {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    /* reduced gap */
+    padding: 10px 10px;
+    /* reduced h-padding */
+    background: white;
+    border-top: 2px solid #ebebeb;
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+}
+
+.btn-nav-arrow {
+    padding: 8px 12px;
+    /* reduced padding */
+    background: #f0f0f0;
+    color: #555;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.btn-nav-arrow:hover:not(:disabled) {
+    background: #e5e5e5;
+}
+
+.btn-nav-arrow:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.btn-next-primary {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-next-primary:hover:not(:disabled) {
+    opacity: 0.88;
+    background: var(--color-primary);
+}
+
+.row-jump {
+    flex: 1;
+    display: flex;
+    gap: 4px;
+}
+
+.row-jump input {
+    flex: 1;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 7px 8px;
+    font-size: 12px;
+    text-align: center;
+    outline: none;
+    min-width: 0;
+}
+
+.row-jump input:focus {
+    border-color: var(--color-primary);
+}
+
+.row-jump button {
+    padding: 7px 10px;
+    background: #f0f0f0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    transition: background 0.15s;
+}
+
+.row-jump button:hover {
+    background: #e5e5e5;
+}

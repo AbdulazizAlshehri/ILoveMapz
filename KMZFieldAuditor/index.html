@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KMZ Field Auditor - NQoS Tools</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="../shared.css">
+    <link rel="stylesheet" href="../kmz_core.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+
+<body>
+
+    <!-- ── NAVBAR ─────────────────────────────────────────────────────── -->
+    <nav class="navbar">
+        <a href="../index.html" class="brand">NQoS<span>Tools</span></a>
+        <div class="nav-menu" style="display:flex; align-items:center; gap:8px;">
+            <span id="nav-layer-count" class="nav-badge" style="display:none;">
+                <i class="fa-solid fa-layer-group"></i>
+                <span id="nav-count-num">0</span> layer(s)
+            </span>
+            <button id="btn-export" class="btn-nav-primary" style="display:none;">
+                <i class="fa-solid fa-file-excel"></i> Export Excel
+            </button>
+            <button id="btn-upload-nav" class="btn-nav-primary">
+                <i class="fa-solid fa-plus"></i> Add Layer
+            </button>
+            <input type="file" id="file-input-nav" accept=".kml,.kmz" style="display:none;" multiple>
+        </div>
+    </nav>
+
+    <!-- ── APP BODY ───────────────────────────────────────────────────── -->
+    <div id="app-body">
+
+        <!-- LEFT: Layer Sidebar -->
+        <aside id="layer-sidebar" class="sidebar-hidden">
+            <div class="sidebar-header">
+                <span><i class="fa-solid fa-layer-group" style="color:var(--color-primary);"></i> Layers</span>
+                <button id="btn-clear-all" title="Remove all layers">
+                    <i class="fa-solid fa-trash"></i> Clear all
+                </button>
+            </div>
+            <div id="layer-list"></div>
+            <div class="sidebar-footer">
+                <button id="btn-add-more">
+                    <i class="fa-solid fa-plus"></i> Add KMZ file
+                </button>
+                <input type="file" id="file-input-map" accept=".kml,.kmz" style="display:none;" multiple>
+            </div>
+        </aside>
+
+        <!-- CENTER: Map -->
+        <div id="map-wrap">
+            <div id="map"></div>
+
+            <!-- Upload overlay -->
+            <div id="upload-overlay">
+                <div class="upload-card">
+                    <i class="fa-solid fa-magnifying-glass-location"
+                        style="font-size:3rem; color:var(--color-primary); margin-bottom:16px;"></i>
+                    <h2 style="margin-bottom:8px;">KMZ Field Auditor</h2>
+                    <p style="color:#888; margin-bottom:24px; line-height:1.5;">
+                        Drop your KMZ/KML and Excel files here,<br>or use the buttons on the right panel.
+                    </p>
+                    <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+                        <button class="btn-action-main" id="btn-select-kmz-initial">
+                            <i class="fa-solid fa-map"></i> Select KMZ/KML file(s)
+                        </button>
+                        <input type="file" id="file-input-initial" accept=".kml,.kmz" style="display:none;" multiple>
+                    </div>
+                    <p style="margin-top:14px; color:#bbb; font-size:13px;">or drag &amp; drop files anywhere</p>
+                </div>
+            </div>
+
+            <!-- Feature flash -->
+            <div id="feature-flash" class="feature-flash hidden"></div>
+        </div>
+
+        <!-- RIGHT: Audit Panel — ALWAYS VISIBLE -->
+        <aside id="audit-panel">
+
+            <!-- ── Section 1: Config ──────────────────────────────── -->
+            <div class="audit-section config-section">
+                <div class="section-title">
+                    <i class="fa-solid fa-sliders"></i> Setup
+                </div>
+
+                <!-- Excel file loader -->
+                <div class="config-row">
+                    <label class="config-label">
+                        <i class="fa-solid fa-file-excel" style="color:#27ae60;"></i> Excel file
+                    </label>
+                    <div class="config-file-row">
+                        <span id="excel-filename" class="config-file-name">No file loaded</span>
+                        <button id="btn-load-excel" class="btn-config-file" title="Load Excel file">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </button>
+                        <input type="file" id="file-input-excel" accept=".xlsx,.xls,.csv" style="display:none;">
+                    </div>
+                </div>
+
+                <!-- Lookup column -->
+                <div class="config-row">
+                    <label class="config-label" for="sel-lookup-col">
+                        <i class="fa-solid fa-table-columns"></i> Lookup column
+                    </label>
+                    <select id="sel-lookup-col" class="config-select">
+                        <option value="">— load Excel first —</option>
+                    </select>
+                </div>
+
+                <!-- Target layer -->
+                <div class="config-row">
+                    <label class="config-label" for="sel-target-layer">
+                        <i class="fa-solid fa-crosshairs"></i> Target layer
+                    </label>
+                    <select id="sel-target-layer" class="config-select">
+                        <option value="">— load KMZ first —</option>
+                    </select>
+                </div>
+
+                <!-- Note column name -->
+                <div class="config-row">
+                    <label class="config-label" for="inp-note-col">
+                        <i class="fa-solid fa-pen"></i> Note column
+                    </label>
+                    <input type="text" id="inp-note-col" class="config-input" value="Audit Note"
+                        placeholder="Column header for output">
+                </div>
+            </div>
+
+            <!-- ── Section 2: Progress ────────────────────────────── -->
+            <div class="audit-section progress-section">
+                <div class="section-title">
+                    <i class="fa-solid fa-list-check"></i> Progress
+                </div>
+
+                <!-- Big row counter -->
+                <div class="progress-counter">
+                    <span id="prog-cur" class="prog-num">—</span>
+                    <span class="prog-sep">/</span>
+                    <span id="prog-total" class="prog-total">—</span>
+                    <span class="prog-label">rows</span>
+                </div>
+
+                <!-- Progress bar -->
+                <div class="progress-bar-track">
+                    <div id="audit-progress-bar" class="progress-bar-fill" style="width:0%"></div>
+                </div>
+                <div class="progress-meta">
+                    <span id="prog-pct" class="prog-pct">0%</span>
+                    <span id="prog-annotated" class="prog-annotated">0 annotated</span>
+                </div>
+            </div>
+
+            <!-- ── Section 3: Current Row ─────────────────────────── -->
+            <div class="audit-section row-section">
+                <div class="section-title">
+                    <i class="fa-solid fa-location-dot"></i> Current Feature
+                </div>
+
+                <div class="row-id-wrap">
+                    <span id="row-id-label" class="row-id-badge">—</span>
+                    <span id="row-match-status" class="match-status"></span>
+                </div>
+
+                <div id="row-extra-fields" class="row-extra-fields"></div>
+
+                <!-- Not-found warning -->
+                <div id="not-found-banner" class="not-found-banner hidden">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Not found in target layer
+                </div>
+            </div>
+
+            <!-- ── Section 4: Note ────────────────────────────────── -->
+            <div class="audit-section note-section">
+                <div class="section-title">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    Audit Note
+                    <span id="note-col-name" class="note-col-tag"></span>
+                </div>
+                <textarea id="audit-note" class="audit-textarea" placeholder="Type your note here…"></textarea>
+            </div>
+
+            <!-- ── Section 5: Stats ───────────────────────────────── -->
+            <div class="audit-section stats-section">
+                <div class="section-title">
+                    <i class="fa-solid fa-chart-simple"></i> Annotation Counts
+                    <span id="stats-total-badge" class="stats-total-badge"></span>
+                </div>
+                <div id="audit-stats-list" class="stats-list">
+                    <span class="stats-empty">No annotations yet</span>
+                </div>
+            </div>
+
+            <!-- ── Section 6: Navigation ──────────────────────────── -->
+            <div class="audit-nav-section">
+                <button id="btn-prev" class="btn-nav-arrow" disabled title="Previous (←)">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+
+                <div class="row-jump">
+                    <input type="number" id="row-jump-input" min="1" placeholder="#">
+                    <button id="btn-jump">Go</button>
+                </div>
+
+                <button id="btn-next" class="btn-nav-arrow btn-next-primary" disabled title="Next (→)">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+
+        </aside>
+
+    </div><!-- /app-body -->
+
+    <script src="../shared.js"></script>
+    <script src="../kmz_core.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

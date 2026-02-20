@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel to KMZ Points - NQoS Tools</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../shared.css">
+    <!-- Libraries -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="../logTracker.js"></script>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <a href="../index.html" class="brand">
+            NQoS<span>Tools</span>
+        </a>
+        <div class="nav-menu">
+            <a href="../index.html" class="nav-item">ALL TOOLS</a>
+        </div>
+    </nav>
+
+    <!-- TOOL STAGE -->
+    <div class="tool-stage">
+
+        <div class="tool-header">
+            <h1>Excel to KMZ Points</h1>
+            <p>Convert your Excel spreadsheets to Google Earth KMZ files with precision.</p>
+        </div>
+
+        <!-- VIEW 1: UPLOAD -->
+        <div id="upload-view" class="view active">
+            <!-- Unified Drop Zone -->
+            <div class="file-drop-container mode-single">
+                <div class="file-drop-zone" id="drop-zone-main">
+                    <i class="fa-solid fa-file-excel drop-icon"></i>
+                    <h3 class="drop-title">Upload Excel/CSV File</h3>
+                    <p class="drop-subtitle">Drag & drop your file here or click to select</p>
+                    <button class="btn-select-file">
+                        <i class="fa-solid fa-folder-open"></i> Select Excel File
+                    </button>
+                    <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none;">
+                    <div class="file-info"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: CONFIGURATION -->
+        <div id="config-view" class="view hidden" style="width: 100%; max-width: 800px; text-align: left;">
+            <div
+                style="padding: 32px 0; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.08); transition: none; transform: none;">
+                <div style="padding: 0 32px;">
+                    <h3 style="margin-bottom: 24px; font-size: 20px; font-weight: 600; color: #2c3e50;">
+                        <i class="fa-solid fa-gear" style="color: #e74c3c; margin-right: 8px;"></i> Configure Conversion
+                    </h3>
+
+                    <!-- Coordinate Mode -->
+                    <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
+                        <label
+                            style="font-weight: 600; display: block; margin-bottom: 12px; font-size: 14px; color: #2c3e50;">Coordinate
+                            Mode:</label>
+                        <div style="display: flex; gap: 24px;">
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                                <input type="radio" name="coord-mode" value="separate" checked
+                                    style="width: 16px; height: 16px;">
+                                <span>Lat/Lon Columns</span>
+                            </label>
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                                <input type="radio" name="coord-mode" value="single" style="width: 16px; height: 16px;">
+                                <span>Single "Coordinates" Column</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Separate Mode -->
+                    <div id="separate-mode-inputs"
+                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+                        <div>
+                            <label for="lat-select"
+                                style="display: block; font-size: 13px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Latitude
+                                Column</label>
+                            <select id="lat-select" class="form-select"
+                                style="width: 100%; padding: 10px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;"></select>
+                        </div>
+                        <div>
+                            <label for="lon-select"
+                                style="display: block; font-size: 13px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Longitude
+                                Column</label>
+                            <select id="lon-select" class="form-select"
+                                style="width: 100%; padding: 10px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;"></select>
+                        </div>
+                    </div>
+
+                    <!-- Single Mode -->
+                    <div id="single-mode-inputs" class="hidden" style="margin-bottom: 24px;">
+                        <label for="coord-select"
+                            style="display: block; font-size: 13px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Coordinates
+                            Column</label>
+                        <select id="coord-select" class="form-select"
+                            style="width: 100%; padding: 10px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;"></select>
+                    </div>
+
+                    <!-- Optional Fields -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+                        <div>
+                            <label for="name-select"
+                                style="display: block; font-size: 13px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Name
+                                Column <span style="color: #95a5a6; font-weight: 400;">(Optional)</span></label>
+                            <select id="name-select" class="form-select"
+                                style="width: 100%; padding: 10px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;"></select>
+                        </div>
+                        <div>
+                            <label for="group-select"
+                                style="display: block; font-size: 13px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Group/Folder
+                                <span style="color: #95a5a6; font-weight: 400;">(Optional)</span></label>
+                            <select id="group-select" class="form-select"
+                                style="width: 100%; padding: 10px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;"></select>
+                            <label
+                                style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; margin-top: 12px;">
+                                <input type="checkbox" id="ignore-case-check" checked
+                                    style="width: 14px; height: 14px;">
+                                <span style="color: #34495e;">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Options -->
+                    <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
+                        <div style="margin-top: 0;">
+                            <label
+                                style="display: block; font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Placemark
+                                Styles:</label>
+                            <div style="font-size: 12px; color: #7f8c8d; margin-bottom: 8px;">
+                                *If a Group/Folder column is selected, you can choose a distinct icon for each unique
+                                group.*
+                            </div>
+                            <div id="style-config-container"
+                                style="max-height: 200px; overflow-y: auto; padding: 12px; border: 1px solid #ecf0f1; border-radius: 6px; background: white;">
+                                <!-- Group rows injected here -->
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
+                                <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">Scale:</label>
+                                <input type="number" id="scale-input" value="1.2" step="0.1"
+                                    style="width: 70px; padding: 8px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; text-align: center;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 32px; padding: 0 32px;">
+                <button id="btn-cancel"
+                    style="padding: 10px 20px; background: #eee; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                <button class="btn-action-main" id="btn-convert" style="font-size: 1rem; padding: 10px 30px;">Convert to
+                    KMZ</button>
+            </div>
+
+            <div style="margin-top:10px; font-size:12px; color:#999; text-align:right;">
+                Selected File: <span id="file-name"></span>
+            </div>
+
+            <!-- Icon Picker Popup (Hidden by default) -->
+            <div id="icon-popup" class="hidden"
+                style="position: absolute; width: 320px; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; padding: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
+                <!-- Icons injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEW 3: PROCESSING -->
+    <div id="processing-view" class="view hidden" style="text-align: center;">
+        <h3 style="margin-bottom: 20px;">Processing...</h3>
+        <div class="progress-container"
+            style="width: 100%; max-width: 400px; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; margin: 0 auto;">
+            <div id="progress-bar"
+                style="width: 0%; height: 100%; background: var(--color-primary); transition: width 0.3s;"></div>
+        </div>
+        <p id="progress-text" style="margin-top: 15px; color: #666;">Parsing file...</p>
+    </div>
+
+    <!-- VIEW 4: RESULT -->
+    <div id="result-view" class="view hidden" style="text-align:center;">
+        <i class="fa-solid fa-check-circle" style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
+        <h2 style="margin-bottom:20px;">Conversion Completed!</h2>
+        <button class="btn-action-main" id="btn-download">
+            <i class="fa-solid fa-download"></i> Download Again
+        </button>
+        <div style="margin-top:20px;">
+            <a href="#" id="btn-restart" style="color:#666; text-decoration:underline;">Convert another file</a>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="../index.html" class="footer-link">Home</a>
+                <a href="#" class="footer-link">Features</a>
+                <a href="#" class="footer-link">Privacy Policy</a>
+            </div>
+            <p class="footer-copy">© 2026 NQoS Tools.</p>
+        </div>
+    </footer>
+
+    <script src="../shared.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

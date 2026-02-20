@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Radius Generator - NQoS Tools</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../shared.css">
+    <!-- Libraries -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <a href="../index.html" class="brand">
+            NQoS<span>Tools</span>
+        </a>
+        <div class="nav-menu">
+            <a href="../index.html" class="nav-item">ALL TOOLS</a>
+        </div>
+    </nav>
+
+    <!-- TOOL STAGE -->
+    <div class="tool-stage">
+
+        <div class="tool-header">
+            <h1>Site Radius Generator</h1>
+            <p>Generate coverage circles around your sites for Google Earth.</p>
+        </div>
+
+        <!-- VIEW 1: UPLOAD -->
+        <div id="upload-view" class="view active">
+            <div class="file-drop-container mode-single">
+                <div class="file-drop-zone" id="drop-zone-main">
+                    <i class="fa-solid fa-circle-dot drop-icon"></i>
+                    <h3 class="drop-title">Upload Excel/CSV File</h3>
+                    <p class="drop-subtitle">Drag & drop your file here or click to select</p>
+                    <button class="btn-select-file">
+                        <i class="fa-solid fa-folder-open"></i> Select Excel File
+                    </button>
+                    <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none;">
+                    <div class="file-info"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: CONFIG -->
+        <div id="config-view" class="view hidden" style="width: 100%; max-width: 600px; text-align: left;">
+            <div class="tool-card">
+                <h3 style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                    <i class="fa-solid fa-gear"></i> Configure Radius
+                </h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label for="lat-select"
+                            style="display: block; font-size: 14px; color: #666; margin-bottom: 5px;">Latitude
+                            Column</label>
+                        <select id="lat-select" class="form-select"
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></select>
+                    </div>
+                    <div>
+                        <label for="lon-select"
+                            style="display: block; font-size: 14px; color: #666; margin-bottom: 5px;">Longitude
+                            Column</label>
+                        <select id="lon-select" class="form-select"
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="name-select"
+                        style="display: block; font-size: 14px; color: #666; margin-bottom: 5px;">Site Name/ID
+                        (Optional)</label>
+                    <select id="name-select" class="form-select"
+                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></select>
+                </div>
+
+                <div style="margin:20px 0;">
+                    <label style="display:block; margin-bottom:10px; font-weight:600;">Radius (Meters):</label>
+                    <input type="text" id="radius-input" value="100" placeholder="e.g. 100, 200, 500"
+                        style="padding:10px; width:100%; border:1px solid #ddd; border-radius:6px;">
+                    <div style="font-size:12px; color:#999; margin-top:5px;">Comma separated for multiple rings</div>
+                </div>
+
+                <div style="margin:20px 0; display:flex; gap:20px; align-items:center;">
+                    <div>
+                        <label style="display:block; margin-bottom:10px; font-weight:600;">Opacity:</label>
+                        <input type="number" id="opacity-input" value="0.4" step="0.1" min="0" max="1"
+                            style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 25px;">
+                        <input type="checkbox" id="colorize-check" checked> Randomize Colors
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button id="btn-cancel"
+                        style="padding: 10px 20px; background: #eee; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                    <button class="btn-action-main" id="btn-generate"
+                        style="font-size: 1rem; padding: 10px 30px;">Generate KMZ</button>
+                </div>
+                <div style="margin-top:10px; font-size:12px; color:#999; text-align:right;">
+                    Selected File: <span id="file-name"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: PROCESSING -->
+        <div id="processing-view" class="view hidden" style="text-align: center;">
+            <h3 style="margin-bottom: 20px;">Generating...</h3>
+            <div class="progress-container"
+                style="width: 100%; max-width: 400px; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; margin: 0 auto;">
+                <div id="progress-bar"
+                    style="width: 0%; height: 100%; background: var(--color-primary); transition: width 0.3s;"></div>
+            </div>
+            <p id="progress-text" style="margin-top: 15px; color: #666;">Processing geometry...</p>
+        </div>
+
+        <!-- VIEW 4: RESULT -->
+        <div id="result-view" class="view hidden" style="text-align:center;">
+            <i class="fa-solid fa-check-circle" style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
+            <h2 style="margin-bottom:20px;">Generation Completed!</h2>
+            <button class="btn-action-main" id="btn-download">
+                <i class="fa-solid fa-download"></i> Download Again
+            </button>
+            <div style="margin-top:20px;">
+                <button id="btn-restart"
+                    style="background:none; border:none; color:#666; text-decoration:underline; cursor:pointer;">Process
+                    another file</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="../index.html" class="footer-link">Home</a>
+                <a href="#" class="footer-link">Features</a>
+                <a href="#" class="footer-link">Privacy Policy</a>
+            </div>
+            <p class="footer-copy">© 2026 NQoS Tools.</p>
+        </div>
+    </footer>
+
+    <script src="../shared.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

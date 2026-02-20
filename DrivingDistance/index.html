@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driving Distance Calculator - NQoS Tools</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../shared.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <a href="../index.html" class="brand">NQoS<span>Tools</span></a>
+        <div class="nav-menu">
+            <a href="../index.html" class="nav-item">ALL TOOLS</a>
+        </div>
+    </nav>
+    <div class="tool-stage">
+        <div class="tool-header">
+            <h1>Calculate Driving Distance</h1>
+            <p>Determine actual drive distances between target points and a list of locations.</p>
+        </div>
+        <div id="upload-view" class="view active">
+            <div class="file-drop-container mode-single">
+                <div class="file-drop-zone" id="drop-zone-main">
+                    <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                    <h3 class="drop-title">Upload Coordinates File</h3>
+                    <p class="drop-subtitle">Drag & drop your file here or click to select</p>
+                    <button class="btn-select-file">
+                        <i class="fa-solid fa-folder-open"></i> Select File
+                    </button>
+                    <input type="file" id="file-input" style="display:none;">
+                    <div class="file-info"></div>
+                </div>
+            </div>
+        </div>
+        <div id="config-view" class="view hidden" style="width: 100%; max-width: 600px; text-align: left;">
+            <div class="tool-card" style="padding: 32px 0;">
+                <div style="padding: 0 32px;">
+                    <h3 style="margin-bottom: 24px; font-size: 20px; font-weight: 600; color: #2c3e50;">
+                        <i class="fa-solid fa-gear" style="color: #e74c3c; margin-right: 8px;"></i> Configure Router
+                    </h3>
+                    <p>Configuration options will go here.</p>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 32px; padding: 0 32px;">
+                <button id="btn-cancel"
+                    style="padding: 10px 20px; background: #eee; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                <button class="btn-action-main" id="btn-process" style="font-size: 1rem; padding: 10px 30px;">Calculate
+                    Distances</button>
+            </div>
+        </div>
+        <div id="processing-view" class="view hidden" style="text-align: center;">
+            <h3 style="margin-bottom: 20px;">Fetching Routes...</h3>
+            <div class="progress-container"
+                style="width: 100%; max-width: 400px; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; margin: 0 auto;">
+                <div id="progress-bar"
+                    style="width: 0%; height: 100%; background: var(--color-primary); transition: width 0.3s;"></div>
+            </div>
+            <p id="progress-text" style="margin-top: 15px; color: #666;">Contacting routing API...</p>
+        </div>
+        <div id="result-view" class="view hidden" style="text-align:center;">
+            <i class="fa-solid fa-check-circle" style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
+            <h2 style="margin-bottom:20px;">Calculations Completed!</h2>
+            <button class="btn-action-main" id="btn-download">
+                <i class="fa-solid fa-download"></i> Download Matrix
+            </button>
+            <div style="margin-top:20px;">
+                <a href="#" id="btn-restart" style="color:#666; text-decoration:underline;">Calculate another list</a>
+            </div>
+        </div>
+    </div>
+    <script src="../shared.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

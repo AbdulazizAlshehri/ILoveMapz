@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KMZ Preview - NQoS Tools</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="../shared.css">
+    <link rel="stylesheet" href="../kmz_core.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+
+<body>
+
+    <!-- ── NAVBAR ─────────────────────────────────────────────────────── -->
+    <nav class="navbar">
+        <a href="../index.html" class="brand">NQoS<span>Tools</span></a>
+        <div class="nav-menu" style="display:flex; align-items:center; gap:8px;">
+            <span id="nav-layer-count" class="nav-badge" style="display:none;">
+                <i class="fa-solid fa-layer-group"></i>
+                <span id="nav-count-num">0</span> layer(s)
+            </span>
+            <button id="btn-upload-nav" class="btn-nav-primary">
+                <i class="fa-solid fa-plus"></i> Add Layer
+            </button>
+            <input type="file" id="file-input-nav" accept=".kml,.kmz" style="display:none;" multiple>
+        </div>
+    </nav>
+
+    <!-- ── APP BODY ───────────────────────────────────────────────────── -->
+    <div id="app-body">
+
+        <!-- LEFT: Layer Sidebar -->
+        <aside id="layer-sidebar" class="sidebar-hidden">
+            <div class="sidebar-header">
+                <span><i class="fa-solid fa-layer-group" style="color:var(--color-primary);"></i> Layers</span>
+                <button id="btn-clear-all" title="Remove all layers">
+                    <i class="fa-solid fa-trash"></i> Clear all
+                </button>
+            </div>
+            <div id="layer-list"></div>
+            <div class="sidebar-footer">
+                <button id="btn-add-more">
+                    <i class="fa-solid fa-plus"></i> Add KMZ file
+                </button>
+                <input type="file" id="file-input-map" accept=".kml,.kmz" style="display:none;" multiple>
+            </div>
+        </aside>
+
+        <!-- CENTER: Map -->
+        <div id="map-wrap">
+            <div id="map"></div>
+
+            <!-- Upload overlay -->
+            <!-- Upload overlay -->
+            <div id="upload-overlay">
+                <div class="upload-card">
+                    <i class="fa-solid fa-map-location-dot"
+                        style="font-size:3rem; color:var(--color-primary); margin-bottom:16px;"></i>
+                    <h2 style="margin-bottom:8px;">KMZ Preview</h2>
+                    <p style="color:#888; margin-bottom:24px; line-height:1.5;">
+                        Drop your KMZ/KML files here to view them on the map.
+                    </p>
+                    <button class="btn-action-main" id="btn-select-file-initial">
+                        <i class="fa-solid fa-map"></i> Select KMZ/KML file(s)
+                    </button>
+                    <input type="file" id="file-input-initial" accept=".kml,.kmz" style="display:none;" multiple>
+                    <p style="margin-top:14px; color:#bbb; font-size:13px;">or drag &amp; drop files anywhere</p>
+                </div>
+            </div>
+
+            <!-- Feature flash (unused in preview largely, but kept for core compat) -->
+            <div id="feature-flash" class="feature-flash hidden"></div>
+        </div>
+
+    </div><!-- /app-body -->
+
+    <script src="../shared.js"></script>
+    <script src="../kmz_core.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

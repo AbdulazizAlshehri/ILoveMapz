@@ -1,0 +1,9 @@
+node_modules/
+.env
+.DS_Store
+*.kmz
+*.kml
+*.xlsx
+*.csv
+!test_data.csv
+.vscode/
