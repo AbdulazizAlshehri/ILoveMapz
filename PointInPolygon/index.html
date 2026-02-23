@@ -13,7 +13,9 @@
 <body>
     <!-- NAVBAR -->
     <nav class="navbar">
-        <a href="../index.html" class="brand">NQoS<span>Tools</span></a>
+        <a href="../index.html" class="brand">
+            <img src="../assets/logo.png" alt="NQoS Tools" class="brand-logo">
+        </a>
         <div class="nav-menu">
             <a href="../index.html" class="nav-item">ALL TOOLS</a>
         </div>
@@ -44,12 +46,15 @@
 
         <!-- VIEW 2: CONFIGURATION -->
         <div id="config-view" class="view hidden" style="width: 100%; max-width: 600px; text-align: left;">
-            <div class="tool-card" style="padding: 32px 0;">
+            <div
+                style="padding: 32px 0; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.08); transition: none; transform: none;">
                 <div style="padding: 0 32px;">
                     <h3 style="margin-bottom: 24px; font-size: 20px; font-weight: 600; color: #2c3e50;">
-                        <i class="fa-solid fa-gear" style="color: #e74c3c; margin-right: 8px;"></i> Configure Action
+                        <i class="fa-solid fa-gear" style="color: #95c11f; margin-right: 8px;"></i> Configure Action
                     </h3>
-                    <p>Configuration options will go here.</p>
+                    <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
+                        <p style="color: #7f8c8d; font-size: 14px;">Configuration options will go here.</p>
+                    </div>
                 </div>
             </div>
             <div style="display: flex; justify-content: center; gap: 10px; margin-top: 32px; padding: 0 32px;">
@@ -75,11 +80,14 @@
         <div id="result-view" class="view hidden" style="text-align:center;">
             <i class="fa-solid fa-check-circle" style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
             <h2 style="margin-bottom:20px;">Process Completed!</h2>
+            <div id="result-summary" class="result-stats-board"></div>
             <button class="btn-action-main" id="btn-download">
                 <i class="fa-solid fa-download"></i> Download Again
             </button>
             <div style="margin-top:20px;">
-                <a href="#" id="btn-restart" style="color:#666; text-decoration:underline;">Process another file</a>
+                <button id="btn-restart"
+                    style="background:none; border:none; color:#666; text-decoration:underline; cursor:pointer;">Process
+                    another file</button>
             </div>
         </div>
     </div>

@@ -1,17 +1,16 @@
 /* 
-   NQoS Tools - iLovePDF Style (Based on Reference Images)
+   iLoveMapz - iLovePDF Style (Based on Reference Images)
    Complete visual redesign matching iLovePDF.com aesthetic
 */
 
 /* === VARIABLES === */
 :root {
     /* Colors from iLovePDF */
-    --color-primary: #e74c3c;
-    --color-primary-hover: #c0392b;
+    --color-primary: #E5322D;
+    --color-primary-hover: #C81B1B;
 
     /* Backgrounds */
-    --color-bg-body: #fef5f5;
-    /* Light pink tint */
+    --color-bg-body: #F5F5F5;
     --color-bg-card: #ffffff;
 
     /* Text */
@@ -80,16 +79,16 @@ a {
 }
 
 .brand {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--color-text-main);
     display: flex;
     align-items: center;
-    gap: 6px;
+    height: 100%;
 }
 
-.brand span {
-    color: var(--color-primary);
+.brand-logo {
+    height: 34px;
+    /* Reduced by another 10% per user request */
+    width: auto;
+    display: block;
 }
 
 .nav-menu {
@@ -218,6 +217,16 @@ a {
     max-width: 500px;
 }
 
+.tool-header.condensed h1 {
+    margin-bottom: 10px;
+    /* Tighter gap */
+}
+
+.tool-header.condensed p {
+    display: none;
+}
+
+
 /* === BUTTONS === */
 .btn-action-main {
     background-color: var(--color-primary);
@@ -290,6 +299,68 @@ a {
 
 .view.active {
     display: block;
+}
+
+/* Fix large icon spacing in result view */
+#result-view i {
+    line-height: 1 !important;
+}
+
+/* === RESULT STATS BOARD === */
+.result-stats-board {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 0 auto 30px auto;
+    flex-wrap: wrap;
+    max-width: 600px;
+}
+
+.stat-box {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 16px 24px;
+    min-width: 140px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s ease;
+}
+
+.stat-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.stat-box.success .stat-value {
+    color: var(--color-primary);
+}
+
+.stat-box.error .stat-value {
+    color: #e74c3c;
+}
+
+.stat-box.neutral .stat-value {
+    color: #3498db;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--color-text-main);
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* === RESPONSIVE === */

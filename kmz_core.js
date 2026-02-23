@@ -4,7 +4,7 @@
 
 // ─── Color Palette ────────────────────────────────────────────────
 const LAYER_COLORS = [
-    '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+    'var(--color-primary)', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
     '#1abc9c', '#e67e22', '#34495e', '#e91e63', '#00bcd4'
 ];
 let colorIndex = 0;
@@ -449,7 +449,7 @@ document.addEventListener('keydown', async e => {
             if (date) loadingPopup.setContent(`<div style="font-size:13px; font-weight:600;">Imagery Date: ${date}</div>`);
             else loadingPopup.setContent('<div style="font-size:12px; color:#999;">Date unavailable</div>');
         } catch (err) {
-            loadingPopup.setContent('<div style="font-size:12px; color:#e74c3c;">Offline / Error</div>');
+            loadingPopup.setContent('<div style="font-size:12px; color:#95c11f;">Offline / Error</div>');
         }
     }
 });

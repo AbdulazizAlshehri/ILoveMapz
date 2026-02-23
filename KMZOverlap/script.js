@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressDetails = document.getElementById('progress-details');
 
     // Result
-    const statsSummary = document.getElementById('stats-summary');
+    const resultSummary = document.getElementById('result-summary');
     const btnDownload = document.getElementById('btn-download');
     const btnRestart = document.getElementById('btn-restart');
 
@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
             JobTracker.fail(jobId, err.message);
             // Show error in processing view instead of reloading
             updateProgress(0, 'Analysis Failed', err.message);
-            document.getElementById('progress-bar').style.background = '#e74c3c';
+            document.getElementById('progress-bar').style.background = 'var(--color-primary)';
             // Add a back button
             const backBtn = document.createElement('button');
             backBtn.className = 'btn-action-main';
@@ -344,6 +344,16 @@ document.addEventListener('DOMContentLoaded', () => {
             view.classList.remove('hidden');
             view.classList.add('active');
         }
+
+        // Hide header description and reduce margin on processing/result views to perfectly center content
+        const toolHeader = document.querySelector('.tool-header');
+        if (toolHeader) {
+            if (view === processingView || view === resultView) {
+                toolHeader.classList.add('condensed');
+            } else {
+                toolHeader.classList.remove('condensed');
+            }
+        }
     }
 
     function updateProgress(percent, text, details) {
@@ -356,10 +366,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Average multiplied by 100 purely for UI text display, NOT for Excel
         const avg = results.reduce((acc, r) => acc + (r.Coverage_Percent || 0), 0) / (results.length || 1);
 
-        statsSummary.innerHTML = `
-            <div class="stats-row"><span>Analyzed Targets:</span> <span>${results.length}</span></div>
-            <div class="stats-row"><span>Source Polygons Used:</span> <span>${sourceCount}</span></div>
-            <div class="stats-row"><span>Average Coverage:</span> <span>${(avg * 100).toFixed(2)}%</span></div>
+        resultSummary.innerHTML = `
+            <div class="stat-box neutral">
+                <span class="stat-value">${results.length}</span>
+                <span class="stat-label">Targets Analyzed</span>
+            </div>
+            <div class="stat-box neutral">
+                <span class="stat-value">${sourceCount}</span>
+                <span class="stat-label">Source Polygons</span>
+            </div>
+            <div class="stat-box success">
+                <span class="stat-value">${(avg * 100).toFixed(2)}%</span>
+                <span class="stat-label">Avg Coverage</span>
+            </div>
         `;
     }
 });

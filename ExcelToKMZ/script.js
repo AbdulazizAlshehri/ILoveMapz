@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressText = document.getElementById('progress-text');
     const btnDownload = document.getElementById('btn-download');
     const btnRestart = document.getElementById('btn-restart');
+    const resultSummary = document.getElementById('result-summary');
 
     let currentFile = null;
     let workbook = null;
@@ -458,9 +459,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateProgress(100, "Done!");
                 setTimeout(() => {
                     showView(resultView);
-                    progressText.textContent = `Converted ${results.validCount} locations.`;
+                    resultSummary.innerHTML = `
+                        <div class="stat-box success">
+                            <span class="stat-value">${results.validCount}</span>
+                            <span class="stat-label">Converted</span>
+                        </div>
+                    `;
                     if (results.errorCount > 0) {
-                        progressText.textContent += ` (${results.errorCount} skipped)`;
+                        resultSummary.innerHTML += `
+                            <div class="stat-box error">
+                                <span class="stat-value">${results.errorCount}</span>
+                                <span class="stat-label">Skipped</span>
+                            </div>
+                        `;
                     }
 
                     // Auto-download on success
@@ -746,6 +757,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         viewElement.classList.remove('hidden');
         viewElement.classList.add('active');
+
+        // Hide header description and reduce margin on processing/result views to perfectly center content
+        const toolHeader = document.querySelector('.tool-header');
+        if (toolHeader) {
+            if (viewElement === processingView || viewElement === resultView) {
+                toolHeader.classList.add('condensed');
+            } else {
+                toolHeader.classList.remove('condensed');
+            }
+        }
     }
 
     function updateProgress(percent, text) {
@@ -763,6 +784,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dropZoneController) dropZoneController.reset();
 
         progressBar.style.width = '0%';
+        if (resultSummary) {
+            resultSummary.textContent = '';
+        }
 
         // Reset state
         modeRadios[0].checked = true; // Default to separate on reset

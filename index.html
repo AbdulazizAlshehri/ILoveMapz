@@ -102,8 +102,15 @@
 
         /* ── Grid per section ─────────────────────────────── */
         .tools-grid {
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            max-width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .tool-card {
+            width: 300px;
+            min-height: 200px;
         }
 
         /* ── Main content padding ─────────────────────────── */
@@ -111,7 +118,8 @@
             padding-top: 12px;
             padding-bottom: 40px;
             width: 100%;
-            max-width: 1600px;
+            max-width: 95%;
+            /* Wider landing page */
             margin: 0 auto;
         }
 
@@ -149,6 +157,21 @@
             border-color: var(--color-primary);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
+        /* ── Disabled Card State ─────────────────────────── */
+        .tool-card.disabled {
+            opacity: 0.6;
+            filter: grayscale(0.8);
+            cursor: not-allowed;
+            pointer-events: none;
+            user-select: none;
+            transform: none !important;
+            box-shadow: var(--shadow-card) !important;
+        }
+
+        .tool-card.disabled::before {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -157,7 +180,7 @@
     <!-- NAVBAR -->
     <nav class="navbar">
         <a href="#" class="brand">
-            NQoS<span>Tools</span>
+            <img src="assets/logo.png" alt="NQoS Tools" class="brand-logo">
         </a>
         <div class="nav-menu">
             <!-- History button hidden. Use Alt+H to access history. -->
@@ -166,7 +189,7 @@
 
     <!-- HERO -->
     <header class="hero-landing">
-        <h1 class="hero-title">Every tool you need to work with Network Data</h1>
+        <h1 class="hero-title">Every tool you need to work with Maps and Spatial Data</h1>
         <p class="hero-subtitle">Optimize, convert, and analyze your KMZ and Excel files in one place.</p>
     </header>
 
@@ -202,20 +225,6 @@
                 <p class="tool-desc">Extract sites, coordinates, and metadata from KML files to Excel.</p>
             </a>
 
-            <a href="KMZMerger/index.html" class="tool-card card-conversion">
-                <span class="card-badge badge-conversion"><i class="fa-solid fa-arrows-rotate"></i> Conversion</span>
-                <i class="fa-solid fa-object-ungroup tool-icon"></i>
-                <h3 class="tool-title">KMZ Merger</h3>
-                <p class="tool-desc">Combine multiple KMZ/KML files into a single master file.</p>
-            </a>
-
-            <a href="KMLSplitter/index.html" class="tool-card card-conversion">
-                <span class="card-badge badge-conversion"><i class="fa-solid fa-arrows-rotate"></i> Conversion</span>
-                <i class="fa-solid fa-scissors tool-icon"></i>
-                <h3 class="tool-title">KML Splitter</h3>
-                <p class="tool-desc">Break large map files into manageable smaller pieces.</p>
-            </a>
-
             <!-- VISUALIZATION TOOLS -->
             <a href="KMZPreview/index.html" class="tool-card card-visualization">
                 <span class="card-badge badge-visualization"><i class="fa-solid fa-map"></i> Visualization</span>
@@ -245,27 +254,6 @@
                 <i class="fa-solid fa-object-group tool-icon"></i>
                 <h3 class="tool-title">Calculate Overlap</h3>
                 <p class="tool-desc">Analyze spatial overlap percentages between two KMZ layers.</p>
-            </a>
-
-            <a href="PointInPolygon/index.html" class="tool-card card-analysis">
-                <span class="card-badge badge-analysis"><i class="fa-solid fa-chart-bar"></i> Analysis</span>
-                <i class="fa-solid fa-draw-polygon tool-icon"></i>
-                <h3 class="tool-title">Point in Polygon & Distance</h3>
-                <p class="tool-desc">Determine which zone a coordinate falls into and measure distances.</p>
-            </a>
-
-            <a href="NeighborAuditor/index.html" class="tool-card card-analysis">
-                <span class="card-badge badge-analysis"><i class="fa-solid fa-chart-bar"></i> Analysis</span>
-                <i class="fa-solid fa-network-wired tool-icon"></i>
-                <h3 class="tool-title">Neighbor Auditor</h3>
-                <p class="tool-desc">Analyze distances and potential neighbor relationships between sites.</p>
-            </a>
-
-            <a href="DrivingDistance/index.html" class="tool-card card-analysis">
-                <span class="card-badge badge-analysis"><i class="fa-solid fa-chart-bar"></i> Analysis</span>
-                <i class="fa-solid fa-route tool-icon"></i>
-                <h3 class="tool-title">Calculate Driving Distance</h3>
-                <p class="tool-desc">Determine actual drive distances between target points and a list of locations.</p>
             </a>
 
         </div>

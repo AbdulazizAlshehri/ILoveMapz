@@ -24,9 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnDownload = document.getElementById('btn-download');
     const btnRestart = document.getElementById('btn-restart');
 
-    // Progress
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
+    const resultSummary = document.getElementById('result-summary');
 
     // State
     let currentFile = null;
@@ -190,6 +190,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 JobTracker.finish(jobId, [new File([generatedKmzBlob], outName)]);
 
                 updateProgress(100, "Done!");
+                if (resultSummary) {
+                    resultSummary.innerHTML = `
+                        <div class="stat-box success">
+                            <span class="stat-value">${results.count}</span>
+                            <span class="stat-label">Sites Generated</span>
+                        </div>
+                    `;
+                }
                 showView(resultView);
 
                 // Auto-download on success
@@ -336,6 +344,16 @@ document.addEventListener('DOMContentLoaded', () => {
             view.classList.remove('hidden');
             view.classList.add('active');
         }
+
+        // Hide header description and reduce margin on processing/result views to perfectly center content
+        const toolHeader = document.querySelector('.tool-header');
+        if (toolHeader) {
+            if (view === processingView || view === resultView) {
+                toolHeader.classList.add('condensed');
+            } else {
+                toolHeader.classList.remove('condensed');
+            }
+        }
     }
 
     function updateProgress(percent, text) {
@@ -346,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetApp() {
         currentFile = null;
         fileInput.value = '';
+        if (resultSummary) resultSummary.textContent = '';
 
         // Reset Drop Zone Visuals
         if (dropZoneController) dropZoneController.reset();

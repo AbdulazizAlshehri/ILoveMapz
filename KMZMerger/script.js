@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRestart = document.getElementById('btn-restart');
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
+    const resultSummary = document.getElementById('result-summary');
 
     let currentFiles = [];
     let generatedBlob = null;
@@ -66,6 +67,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 JobTracker.finish(jobId, [new File([generatedBlob], generatedName)]);
 
                 updateProgress(100, 'Done!');
+                if (resultSummary) {
+                    resultSummary.innerHTML = `
+                        <div class="stat-box success">
+                            <span class="stat-value">${currentFiles.length}</span>
+                            <span class="stat-label">Files Merged</span>
+                        </div>
+                    `;
+                }
                 showView(resultView);
 
                 // Auto Download
@@ -90,6 +99,16 @@ document.addEventListener('DOMContentLoaded', () => {
             view.classList.remove('hidden');
             view.classList.add('active');
         }
+
+        // Hide header description and reduce margin on processing/result views to perfectly center content
+        const toolHeader = document.querySelector('.tool-header');
+        if (toolHeader) {
+            if (view === processingView || view === resultView) {
+                toolHeader.classList.add('condensed');
+            } else {
+                toolHeader.classList.remove('condensed');
+            }
+        }
     }
 
     function updateProgress(percent, text) {
@@ -102,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedBlob = null;
         if (dropZoneController) dropZoneController.reset();
         updateProgress(0, "Reading files...");
+        if (resultSummary) resultSummary.textContent = '';
         showView(uploadView);
     }
 });

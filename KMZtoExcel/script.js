@@ -69,6 +69,16 @@ function showView(view) {
         view.classList.remove('hidden');
         view.classList.add('active');
     }
+
+    // Hide header description and reduce margin on processing/result views to perfectly center content
+    const toolHeader = document.querySelector('.tool-header');
+    if (toolHeader) {
+        if (view === processingView || view === resultView) {
+            toolHeader.classList.add('condensed');
+        } else {
+            toolHeader.classList.remove('condensed');
+        }
+    }
 }
 
 function updateProgress(percent, text) {

@@ -21,7 +21,7 @@
     <!-- NAVBAR -->
     <nav class="navbar">
         <a href="../index.html" class="brand">
-            NQoS<span>Tools</span>
+            <img src="../assets/logo.png" alt="NQoS Tools" class="brand-logo">
         </a>
         <div class="nav-menu">
             <a href="../index.html" class="nav-item">ALL TOOLS</a>
@@ -79,18 +79,21 @@
 
         <!-- VIEW 2: CONFIGURATION -->
         <div id="config-view" class="view hidden" style="width: 100%; max-width: 600px; text-align: left;">
-            <div class="tool-card" style="padding: 32px 0;">
+            <div
+                style="padding: 32px 0; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.08); transition: none; transform: none;">
                 <div style="padding: 0 32px;">
                     <h3 style="margin-bottom: 24px; font-size: 20px; font-weight: 600; color: #2c3e50;">
-                        <i class="fa-solid fa-gear" style="color: #e74c3c; margin-right: 8px;"></i> Configure Analysis
+                        <i class="fa-solid fa-gear" style="color: #95c11f; margin-right: 8px;"></i> Configure Analysis
                     </h3>
 
                     <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
-                        <label style="font-weight:600; margin-bottom:8px; display:block; color:#555;">
-                            <i class="fa-solid fa-filter"></i> Filter Target by Name (optional)
+                        <label
+                            style="font-weight:600; margin-bottom:8px; display:block; color:#2c3e50; font-size: 14px;">
+                            <i class="fa-solid fa-filter" style="color:#95a5a6; margin-right:4px;"></i> Filter Target by
+                            Name (optional)
                         </label>
                         <input type="text" id="target-filter" placeholder="e.g. Riyadh, Zone A..."
-                            style="padding:10px 16px; border:1px solid #ddd; border-radius:8px; width:100%; font-size:0.95rem; font-family:inherit;">
+                            style="padding:10px 12px; border:1px solid #ecf0f1; border-radius:6px; width:100%; font-size:14px; background:white;">
                     </div>
                 </div>
             </div>
@@ -123,21 +126,17 @@
         </div>
 
         <!-- VIEW 4: RESULT -->
-        <div id="result-view" class="view hidden" style="width:100%; max-width:700px; text-align:center;">
-            <div class="tool-card" style="padding:40px;">
-                <i class="fa-solid fa-circle-check" style="font-size:3rem; color:#27ae60; margin-bottom:16px;"></i>
-                <h2 style="margin-bottom:20px;">Analysis Complete!</h2>
-                <div id="stats-summary"
-                    style="text-align:left; background:#f9f9f9; border-radius:10px; padding:20px; margin-bottom:28px; font-size:0.95rem; line-height:2;">
-                </div>
-                <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-                    <button class="btn-action-main" id="btn-download">
-                        <i class="fa-solid fa-download"></i> Download Again
-                    </button>
-                    <button class="btn-action-main" id="btn-restart" style="background:#555;">
-                        <i class="fa-solid fa-rotate-left"></i> Analyze Again
-                    </button>
-                </div>
+        <div id="result-view" class="view hidden" style="text-align:center;">
+            <i class="fa-solid fa-check-circle" style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
+            <h2 style="margin-bottom:20px;">Analysis Completed!</h2>
+            <div id="result-summary" class="result-stats-board"></div>
+            <button class="btn-action-main" id="btn-download">
+                <i class="fa-solid fa-download"></i> Download Again
+            </button>
+            <div style="margin-top:20px;">
+                <button id="btn-restart"
+                    style="background:none; border:none; color:#666; text-decoration:underline; cursor:pointer;">Analyze
+                    another file</button>
             </div>
         </div>
 

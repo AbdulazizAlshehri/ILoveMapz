@@ -20,7 +20,7 @@
     <!-- NAVBAR -->
     <nav class="navbar">
         <a href="../index.html" class="brand">
-            NQoS<span>Tools</span>
+            <img src="../assets/logo.png" alt="NQoS Tools" class="brand-logo">
         </a>
         <div class="nav-menu">
             <a href="../index.html" class="nav-item">ALL TOOLS</a>
@@ -57,9 +57,19 @@
             <div
                 style="padding: 32px 0; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.08); transition: none; transform: none;">
                 <div style="padding: 0 32px;">
-                    <h3 style="margin-bottom: 24px; font-size: 20px; font-weight: 600; color: #2c3e50;">
-                        <i class="fa-solid fa-gear" style="color: #e74c3c; margin-right: 8px;"></i> Configure Conversion
-                    </h3>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #2c3e50;">
+                            <i class="fa-solid fa-gear" style="color: var(--color-primary); margin-right: 8px;"></i>
+                            Configure Conversion
+                        </h3>
+                        <div
+                            style="font-size: 12px; color: #7f8c8d; background: #f8f9fa; padding: 4px 10px; border-radius: 12px; border: 1px solid #eaeaea; display: flex; align-items: center; gap: 6px; max-width: 50%;">
+                            <i class="fa-solid fa-file-excel" style="color: var(--color-primary);"></i>
+                            <span id="file-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                title="Selected file"></span>
+                        </div>
+                    </div>
 
                     <!-- Coordinate Mode -->
                     <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
@@ -164,57 +174,60 @@
                     KMZ</button>
             </div>
 
-            <div style="margin-top:10px; font-size:12px; color:#999; text-align:right;">
-                Selected File: <span id="file-name"></span>
+            <div
+                style="display: flex; justify-content: center; gap: 10px; margin-top: 32px; padding: 0 32px; margin-bottom: 10px;">
+
+                <!-- Icon Picker Popup (Hidden by default) -->
+                <div id="icon-popup" class="hidden"
+                    style="position: absolute; width: 320px; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; padding: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
+                    <!-- Icons injected via JS -->
+                </div>
             </div>
 
-            <!-- Icon Picker Popup (Hidden by default) -->
-            <div id="icon-popup" class="hidden"
-                style="position: absolute; width: 320px; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; padding: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
-                <!-- Icons injected via JS -->
+            <!-- VIEW 3: PROCESSING -->
+            <div id="processing-view" class="view hidden" style="text-align: center;">
+                <h3 style="margin-bottom: 20px;">Processing...</h3>
+                <div class="progress-container"
+                    style="width: 100%; max-width: 400px; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; margin: 0 auto;">
+                    <div id="progress-bar"
+                        style="width: 0%; height: 100%; background: var(--color-primary); transition: width 0.3s;">
+                    </div>
+                </div>
+                <p id="progress-text" style="margin-top: 15px; color: #666;">Parsing file...</p>
             </div>
-        </div>
-    </div>
 
-    <!-- VIEW 3: PROCESSING -->
-    <div id="processing-view" class="view hidden" style="text-align: center;">
-        <h3 style="margin-bottom: 20px;">Processing...</h3>
-        <div class="progress-container"
-            style="width: 100%; max-width: 400px; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; margin: 0 auto;">
-            <div id="progress-bar"
-                style="width: 0%; height: 100%; background: var(--color-primary); transition: width 0.3s;"></div>
-        </div>
-        <p id="progress-text" style="margin-top: 15px; color: #666;">Parsing file...</p>
-    </div>
-
-    <!-- VIEW 4: RESULT -->
-    <div id="result-view" class="view hidden" style="text-align:center;">
-        <i class="fa-solid fa-check-circle" style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
-        <h2 style="margin-bottom:20px;">Conversion Completed!</h2>
-        <button class="btn-action-main" id="btn-download">
-            <i class="fa-solid fa-download"></i> Download Again
-        </button>
-        <div style="margin-top:20px;">
-            <a href="#" id="btn-restart" style="color:#666; text-decoration:underline;">Convert another file</a>
-        </div>
-    </div>
-
-    </div>
-
-    <!-- FOOTER -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-links">
-                <a href="../index.html" class="footer-link">Home</a>
-                <a href="#" class="footer-link">Features</a>
-                <a href="#" class="footer-link">Privacy Policy</a>
+            <!-- VIEW 4: RESULT -->
+            <div id="result-view" class="view hidden" style="text-align:center;">
+                <i class="fa-solid fa-check-circle"
+                    style="font-size: 60px; color: var(--color-primary); margin-bottom: 20px;"></i>
+                <h2 style="margin-bottom:20px;">Conversion Completed!</h2>
+                <div id="result-summary" class="result-stats-board"></div>
+                <button class="btn-action-main" id="btn-download">
+                    <i class="fa-solid fa-download"></i> Download Again
+                </button>
+                <div style="margin-top:20px;">
+                    <button id="btn-restart"
+                        style="background:none; border:none; color:#666; text-decoration:underline; cursor:pointer;">Convert
+                        another file</button>
+                </div>
             </div>
-            <p class="footer-copy">© 2026 NQoS Tools.</p>
-        </div>
-    </footer>
 
-    <script src="../shared.js"></script>
-    <script src="script.js"></script>
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-links">
+                    <a href="../index.html" class="footer-link">Home</a>
+                    <a href="#" class="footer-link">Features</a>
+                    <a href="#" class="footer-link">Privacy Policy</a>
+                </div>
+                <p class="footer-copy">© 2026 NQoS Tools.</p>
+            </div>
+        </footer>
+
+        <script src="../shared.js"></script>
+        <script src="script.js"></script>
 </body>
 
 </html>

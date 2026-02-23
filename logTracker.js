@@ -176,9 +176,9 @@
         const btn = document.getElementById('btn-filter');
         if (btn) {
             const isFiltered = jobType || status;
-            btn.style.background = isFiltered ? '#e74c3c' : '';
+            btn.style.background = isFiltered ? '#95c11f' : '';
             btn.style.color = isFiltered ? 'white' : '';
-            btn.style.borderColor = isFiltered ? '#e74c3c' : '';
+            btn.style.borderColor = isFiltered ? '#95c11f' : '';
         }
     }
 

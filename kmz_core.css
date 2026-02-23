@@ -107,7 +107,7 @@ body {
 
 .sidebar-header button:hover {
     background: #fff0f0;
-    color: #e74c3c;
+    color: var(--color-primary);
 }
 
 #layer-list {
@@ -201,7 +201,7 @@ body {
 
 .layer-btn.btn-remove:hover {
     background: #fff0f0;
-    color: #e74c3c;
+    color: #95c11f;
 }
 
 .layer-btn.btn-target.active {

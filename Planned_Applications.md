@@ -9,36 +9,24 @@ This document outlines the prioritized suite of applications for the "NQoS Toolb
 
 | Category | Badge Color | Apps | Status |
 | :--- | :--- | :--- | :--- |
-| 🔄 **Conversion** | Orange | Excel to KMZ Converter, KMZ to Excel Converter, KMZ Merger, KML Splitter | ✅ Live (1, 2) · 🗓️ Planned (Merger, Splitter) |
-| 🗺️ **Visualization** | Green | KMZ Preview App, KMZ Field Auditor | ✅ Live (Both) |
-| 📊 **Analysis** | Blue | Calculate KMZ Overlap, Site Radius Generator, Point-in-Polygon & Distance, Neighbor Relation Auditor, Driving Distance Calculator | ✅ Live (Overlap, Site Radius) · 🗓️ Planned (rest) |
+| 🔄 **Conversion** | Orange | Excel to KMZ Converter, KMZ to Excel Converter | ✅ Live |
+| 🗺️ **Visualization** | Green | KMZ Preview App, KMZ Field Auditor | ✅ Live |
+| 📊 **Analysis** | Blue | Calculate KMZ Overlap, Site Radius Generator | ✅ Live |
 
 ---
 
-## High Priority Applications
-These are the core applications scheduled for immediate development.
+## Live Applications
+These are the active core applications currently available in the NQoS Toolbox.
 
-| Priority | App Name | Category | Use Case | Input | Output |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **HIGH** | **0. Landing Page** | N/A | Central hub to access all tools. | N/A | Navigation |
-| **HIGH** | **1. Excel to KMZ Points** | **Convert** | Convert site lists to Google Earth Points. | Excel/CSV (Lat/Long) | .kmz (Placemarks) |
-| **HIGH** | **2. KMZ to Excel Converter** | **Convert** | Extract data from KMZ back to Excel. | .kmz / .kml | Excel (Name, Lat, Long) |
-| **HIGH** | **3. Calculate KMZ Overlap** | **Analyze** | Calculate overlap of one KMZ on another. | 2 KMZ files | Excel (w/ Coverage %) |
-| **HIGH** | **8. KMZ Preview App** | **View** | Lightweight, offline KMZ viewer. Shared core with Auditor. | .kmz / .kml | Map Visualization |
-| **HIGH** | **10. KMZ Field Auditor** | **View / Annotate** | Map-based field review driven by Excel. Zoom, verify, annotate. | Excel + Multiple KMZ | Annotated Excel |
-
-## Low Priority / Wishlist
-These applications are planned for future phases.
-
-| Priority | App Name | Category | Use Case | Input | Output |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| LOW | **3. Point-in-Polygon & Distance** | **Analyze** | Check if point is inside polygon + distance. | Points (Excel) + Polygons (KML) | Excel (Status, Dist) |
-| LOW | **4. KMZ Merger** | **Merge/Split** | Combine multiple KMZ files into one. | Multiple .kmz files | Merged .kmz |
-| LOW | **5. Site Radius Generator** | **Create** | Draw coverage circles (donuts) around sites. | Excel/CSV (Lat/Long) | KMZ (Circles) |
-| LOW | **6. KML Splitter** | **Merge/Split** | Split large KML by column (e.g., City). | Large Excel/CSV | Zip (Multiple KMZs) |
-| LOW | **7. Neighbor Relation Auditor** | **Analyze** | Find missing neighbors based on distance. | Sites + Neighbor List | List of Missing Nbrs |
-| LOW | **9. Driving Distance Calculator** | **Analyze** | Calculate driving distance and time. | Points (Origins) + Points (Destinations) | Excel (Distance Matrix) |
-
+| App Name | Category | Use Case | Input | Output |
+| :--- | :--- | :--- | :--- | :--- |
+| **0. Landing Page** | N/A | Central hub to access all tools. | N/A | Navigation |
+| **1. Excel to KMZ Points** | **Convert** | Convert site lists to Google Earth Points. | Excel/CSV (Lat/Long) | .kmz (Placemarks) |
+| **2. KMZ to Excel Converter** | **Convert** | Extract data from KMZ back to Excel. | .kmz / .kml | Excel (Name, Lat, Long) |
+| **3. Calculate KMZ Overlap** | **Analyze** | Calculate overlap of one KMZ on another. | 2 KMZ files | Excel (w/ Coverage %) |
+| **4. Site Radius Generator** | **Analyze** | Draw coverage circles (donuts) around sites. | Excel/CSV (Lat/Long) | KMZ (Circles) |
+| **5. KMZ Preview App** | **View** | Lightweight, offline KMZ viewer. Shared core with Auditor. | .kmz / .kml | Map Visualization |
+| **6. KMZ Field Auditor** | **View / Annotate** | Map-based field review driven by Excel. Zoom, verify, annotate. | Excel + Multiple KMZ | Annotated Excel |
 
 ---
 
@@ -64,21 +52,53 @@ These settings apply across all applications in the toolbox to ensure a consiste
     - **Important**: If a column cannot be confidently detected, **do not select any** (leave blank/default)
 
 ### 🚀 Standard Application Workflow (SPA)
-Unless a tool explicitly requires a different approach (e.g. streaming, or map-only views), all tools must follow this 4-step Single Page Application (SPA) workflow, toggling views via JavaScript (`showView`):
+Unless a tool explicitly requires a different approach (e.g. streaming, or map-only views), all tools must follow this 4-step Single Page Application (SPA) workflow:
 
-1. **Upload View (`#upload-view`)**: Intake via a unified drag-and-drop zone. Validates file type.
-2. **Configuration View (`#config-view`)**: Presents all user-configurable parameters (checkboxes, dropdowns mapping to columns). Auto-detects where possible but allows override. Includes a "Cancel" and "Process" button.
-3. **Processing View (`#processing-view`)**: Blocks interaction. Shows progress bar and status text. Initiates `JobTracker.start()`.
-4. **Result View (`#result-view`)**: Confirms completion. Automatically triggers browser file download (`saveAs()`). Provides a "Download Again" and "Convert another file" button. Closes job with `JobTracker.finish()`.
+1. **Upload View**: Intake via a unified drag-and-drop zone. Validates file type.
+2. **Configuration View**: Presents all user-configurable parameters (checkboxes, dropdowns mapping to columns). Auto-detects where possible but allows override. Includes a "Cancel" and "Process" button.
+3. **Processing View**: Blocks interaction. Shows progress bar and status text. Initiates background processing.
+4. **Result View**: Confirms completion. Automatically triggers browser file download. Provides a "Download Again" and "Convert another file" button. Closes the job.
 
 ### 🧰 Shared Components
 - **Unified File Inputs (Non-Map Apps)**:
-    - [x] `ExcelToKMZ`
-    - [x] `KMZtoExcel`
-    - [x] `SiteRadiusGenerator`
-    - [x] `KMZOverlap`
-    - Uses `.file-drop-container` component with `setupUnifiedDropZone` helper.
-    - *Note: Map-based apps (`KMZPreview`, `KMZFieldAuditor`) use custom overlays.*
+    - [x] Excel to KMZ Points
+    - [x] KMZ to Excel Converter
+    - [x] Site Radius Generator
+    - [x] Calculate KMZ Overlap
+    - Uses a standard file drop zone component.
+    - *Note: Map-based apps use custom overlays.*
+
+
+
+---
+
+
+---
+
+
+---
+
+## 📄 Templates
+
+The NQoS Toolbox architecture is built upon a set of standardized components and styling patterns to ensure a professional and unified experience.
+
+### 1. Core UI Components
+These visual building blocks are used consistently across all tools:
+- **Navbar Brand image**: The navbar should always use an image logo wrapped in a `.brand` anchor, specifically: `<img src="../assets/logo.png" alt="NQoS Tools" class="brand-logo">`
+- **Navigation Cards**: Clickable, elevated cards used on the landing page for tool selection.
+- **Configuration Panels**: A standardized layout applied universally across all SPA tools. Features a clean white card background with subtle shadows and rounded corners. Inside, related settings are intuitively grouped into distinct light-gray sub-blocks with consistent padding, paired with highly consistent header typography and a symmetrically aligned action toolbar.
+- **Result Screens**: A clear, results-focused layout featuring a large success icon, a prominent heading, a dedicated summary paragraph for transparent numeric output, and symmetrically aligned action buttons to download or restart.
+- **Action Buttons**: Highly visible primary buttons used to execute core tasks (e.g., "Convert").
+- **Upload Zones**: Standard drag-and-drop areas displaying an icon, a browse button, and the selected file name.
+
+### 2. The 4-Step SPA Workflow
+All new standard tools follow this consistent flow, toggling these primary views seamlessly:
+1. **Upload**: Uses the unified Upload Zone for file intake and type validation.
+2. **Configuration**: Displays the Configuration Panel for user settings and ends with a clear Action Button.
+3. **Processing**: Locks the interface and shows a clean, centered progress bar during background tasks.
+4. **Result**: Confirms completion, automatically triggers the file download, and offers options to restart.
+
+---
 
 
 ---
@@ -89,7 +109,7 @@ Unless a tool explicitly requires a different approach (e.g. streaming, or map-o
 > The central unified dashboard for the NQoS Toolbox.
 
 #### Key Features
-- **Unified Dense Grid Layout:** All applications are displayed in a continuous, responsive CSS grid that stretches horizontally across wide monitors, showing up to 6-8 apps per row due to a condensed card size.
+- **Unified Flexbox Layout:** All applications are displayed in a responsive CSS flexbox layout that stretches up to 95% horizontally across wide monitors, showing wider and consistently sized application cards.
 - **Categorized Badges & Gradients:** Apps are marked with color-coded badges directly on the cards, along with elegant tinted radial background gradients representing their category.
 - **Blueprint Grid Background:** Features a 10px detailed blueprint-style grid background to emphasize the technical "tooling" nature of the suite.
 - **Category Filter Bar:** Includes an interactive filter bar below the header to instantly filter the displayed application cards by category (Conversion, Visualization, Analysis).
@@ -105,22 +125,12 @@ Unless a tool explicitly requires a different approach (e.g. streaming, or map-o
 ### 3. Calculate KMZ Overlap
 > Develop a "Calculate KMZ Overlap" tool. **Workflow:** Standard 4-step SPA. **1. Upload:** Two KMZ files (File A: Coverage/Source, File B: Target/Reference). **2. Config:** Select which file acts as Coverage vs Target. **3. Process:** Calculates spatial overlap locally. **4. Result:** Auto-downloads an Excel file representing File B, appended with a "Coverage %" column.
 
-### 4. Point-in-Polygon & Distance Calculator
-> Create a "Point-in-Polygon & Distance Calculator". **Workflow:** Standard 4-step SPA. **1. Upload:** Points (Excel) and Polygons (KML/KMZ). **2. Config:** Match columns. **3. Process:** Calculates if points fall inside polygons locally; if outside, records distance to nearest boundary. **4. Result:** Auto-downloads appended Excel file with results.
 
-### 5. KMZ Merger
-> Create a "KMZ Merger" utility. **Workflow:** Standard 4-step SPA. **1. Upload:** Multiple KMZ/KML files. **2. Config:** Option to preserve original folder structures or flatten. **3. Process:** Merges into a single KML document. **4. Result:** Auto-downloads the merged `.kmz`.
-
-### 6. Site Radius/Donut Generator
+### 4. Site Radius/Donut Generator
 > Develop a "Site Radius Generator". **Workflow:** Standard 4-step SPA. **1. Upload:** Site list (Excel). **2. Config:** Select Lat/Long columns, input comma-separated radius values (e.g., "500, 1000"). **3. Process:** Generates circular polygons. **4. Result:** Auto-downloads a KMZ file of the drawn circles.
 
-### 7. KML Splitter
-> Create a "KML Splitter" tool. **Workflow:** Standard 4-step SPA. **1. Upload:** Large Excel dataset. **2. Config:** Select a "Split By" column (e.g., "City"). **3. Process:** Generates individual KMLs per unique column value. **4. Result:** Auto-downloads a `.zip` file containing multiple KMZs.
 
-### 8. Neighbor Relation Auditor
-> Develop a "Neighbor Relation Auditor". **Workflow:** Standard 4-step SPA. **1. Upload:** Site coordinates (Excel) and Neighbor relations (Excel/CSV). **2. Config:** Input threshold distance (e.g., "5km"). **3. Process:** Calculates missing neighbors based on distance. **4. Result:** Auto-downloads Excel list of missing relations.
-
-### 9. KMZ Preview App
+### 5. KMZ Preview App
 > **"KMZ Preview"** — A lightweight, offline viewer for KML/KMZ files.
 > **Workflow Exception:** Map-Based SPA. No configuration step. Uploading a file immediately renders it on the map.
 
@@ -139,10 +149,8 @@ Rebuilt on the **shared core** of the KMZ Field Auditor, this preview tool offer
 - **High-Performance Pins**: Custom Canvas-based renderer for 20k+ points.
 - **Offline-First**: Zero external dependencies (except tile server if configured).
 
-### 10. Driving Distance Calculator
-> Create a "Driving Distance Calculator". **Workflow:** Standard 4-step SPA. **1. Upload:** Two lists of points (Excel). **2. Config:** Select parameters. **3. Process:** Calculates driving distance/time via routing service (Requires Internet). **4. Result:** Auto-downloads Distance Matrix Excel.
 
-### 10. KMZ Field Auditor
+### 6. KMZ Field Auditor
 > **"KMZ Field Auditor"** app — a map-based field review and annotation tool.
 
 #### Overview
