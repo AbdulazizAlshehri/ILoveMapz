@@ -55,9 +55,23 @@
             <div
                 style="padding: 32px 0; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.08); transition: none; transform: none;">
                 <div style="padding: 0 32px;">
-                    <h3 style="margin-bottom: 24px; font-size: 20px; font-weight: 600; color: #2c3e50;">
-                        <i class="fa-solid fa-gear" style="color: #95c11f; margin-right: 8px;"></i> Configure Radius
-                    </h3>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #2c3e50;">
+                            <i class="fa-solid fa-gear" style="color: var(--color-primary); margin-right: 8px;"></i>
+                            Configure Radius
+                        </h3>
+
+                        <!-- Uploaded File Display -->
+                        <div
+                            style="display: flex; align-items: center; gap: 8px; background: rgba(229, 50, 45, 0.05); border: 1px solid rgba(229, 50, 45, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 13px; max-width: 75%;">
+                            <i class="fa-solid fa-file-excel" style="color: var(--color-primary);"></i>
+                            <span style="color: var(--color-primary); font-weight: 600;">File:</span>
+                            <span id="file-name"
+                                style="color: #2c3e50; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                title="Selected file"></span>
+                        </div>
+                    </div>
 
                     <!-- Columns Selection -->
                     <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
@@ -123,9 +137,6 @@
                     KMZ</button>
             </div>
 
-            <div style="margin-top:10px; font-size:12px; color:#999; text-align:right;">
-                Selected File: <span id="file-name"></span>
-            </div>
         </div>
 
         <!-- VIEW 3: PROCESSING -->

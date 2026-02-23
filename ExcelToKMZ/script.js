@@ -296,7 +296,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleFile(file) {
         console.log("ExcelToKMZ: handleFile called for", file.name);
         currentFile = file;
-        fileNameDisplay.textContent = file.name;
+        fileNameDisplay.textContent = `${file.name} (${formatFileSize(file.size)})`;
+        fileNameDisplay.title = fileNameDisplay.textContent;
 
         // Show processing briefly while parsing
         showView(processingView);
@@ -324,6 +325,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("ExcelToKMZ: Populating Config...");
                 populateConfig(jsonData);
                 updateStyleConfigUI(); // Ensure UI is updated based on auto-selected grouping column
+
+                // Update file pill with row count
+                const validRows = Math.max(0, jsonData.length - 1);
+                fileNameDisplay.textContent = `${file.name} (${formatFileSize(file.size)}) | ${validRows} rows`;
+                fileNameDisplay.title = fileNameDisplay.textContent;
+
                 console.log("ExcelToKMZ: Config Populated. Showing Config View.");
                 showView(configView);
             } catch (error) {

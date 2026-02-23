@@ -97,7 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleFile(file) {
         currentFile = file;
-        fileNameDisplay.textContent = file.name;
+        fileNameDisplay.textContent = `${file.name} (${formatFileSize(file.size)})`;
+        fileNameDisplay.title = fileNameDisplay.textContent;
 
         showView(processingView);
         updateProgress(10, "Reading file...");
@@ -118,6 +119,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 populateConfig(jsonData[0]); // First row is header
+
+                const validRows = Math.max(0, jsonData.length - 1);
+                fileNameDisplay.textContent = `${file.name} (${formatFileSize(file.size)}) | ${validRows} rows`;
+                fileNameDisplay.title = fileNameDisplay.textContent;
+
                 showView(configView);
 
             } catch (err) {

@@ -81,21 +81,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Functions ---
     // setupDragDrop removed (replaced by shared helper)
 
-    function handleFileSelect(file, type) {
+    async function handleFileSelect(file, type) {
         if (!file || !file.name.match(/\.(kmz|kml)$/i)) {
             alert('Please select a valid .kmz or .kml file.');
             return;
         }
 
+        let displayEl = null;
         if (type === 'A') {
             fileA = file;
-            // Visuals handled by helper (has-file class) + custom logic here if needed
-            // But helper updates .file-info by default. 
-            // We might want to keep the colored border state here?
-            // The shared helper adds .has-file class which gives green border/bg.
-            // We just need to ensure internal state is updated.
+            displayEl = fileNameA;
         } else {
             fileB = file;
+            displayEl = fileNameB;
+        }
+
+        if (displayEl) {
+            displayEl.textContent = `${file.name} (${formatFileSize(file.size)}) | Calculating...`;
+            displayEl.title = displayEl.textContent;
+            try {
+                const geoJson = await parseFileToGeoJSON(file);
+                const polygons = extractPolygons(geoJson);
+                displayEl.textContent = `${file.name} (${formatFileSize(file.size)}) | ${polygons.length} features`;
+                displayEl.title = displayEl.textContent;
+            } catch (e) {
+                console.warn("Could not parse file for features count", e);
+                displayEl.textContent = `${file.name} (${formatFileSize(file.size)})`;
+                displayEl.title = displayEl.textContent;
+            }
         }
 
         checkReady();

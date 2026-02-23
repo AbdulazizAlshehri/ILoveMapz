@@ -34,7 +34,7 @@ const dropZoneController = setupUnifiedDropZone('drop-zone-main', 'file-input', 
     // Logic if file removed manually (though app likely auto-advanced)
 });
 
-function handleFile(file) {
+async function handleFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
     if (ext !== 'kml' && ext !== 'kmz') {
         alert("Please select a valid .kml or .kmz file.");
@@ -42,8 +42,41 @@ function handleFile(file) {
     }
 
     currentFile = file;
-    if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+    if (fileNameDisplay) {
+        fileNameDisplay.textContent = `${file.name} (${formatFileSize(file.size)}) | Calculating...`;
+        fileNameDisplay.title = fileNameDisplay.textContent;
+    }
     showView(configView);
+
+    try {
+        let kmlText = "";
+        if (ext === 'kmz') {
+            const zip = new JSZip();
+            const contents = await zip.loadAsync(file);
+            const kmlFileName = Object.keys(contents.files).find(name => name.endsWith('.kml'));
+            if (kmlFileName) kmlText = await contents.file(kmlFileName).async("string");
+        } else {
+            kmlText = await readFileAsText(file);
+        }
+
+        let placemarkCount = 0;
+        if (kmlText) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(kmlText, "text/xml");
+            placemarkCount = xmlDoc.getElementsByTagName("Placemark").length;
+        }
+
+        if (fileNameDisplay) {
+            fileNameDisplay.textContent = `${file.name} (${formatFileSize(file.size)}) | ${placemarkCount} placemarks`;
+            fileNameDisplay.title = fileNameDisplay.textContent;
+        }
+    } catch (e) {
+        console.warn("Could not pre-parse KMZ for placemark count", e);
+        if (fileNameDisplay) {
+            fileNameDisplay.textContent = `${file.name} (${formatFileSize(file.size)})`;
+            fileNameDisplay.title = fileNameDisplay.textContent;
+        }
+    }
 }
 
 if (btnExtract) {

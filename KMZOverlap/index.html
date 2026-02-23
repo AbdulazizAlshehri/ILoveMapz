@@ -82,9 +82,33 @@
             <div
                 style="padding: 32px 0; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.08); transition: none; transform: none;">
                 <div style="padding: 0 32px;">
-                    <h3 style="margin-bottom: 24px; font-size: 20px; font-weight: 600; color: #2c3e50;">
-                        <i class="fa-solid fa-gear" style="color: #95c11f; margin-right: 8px;"></i> Configure Analysis
-                    </h3>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #2c3e50;">
+                            <i class="fa-solid fa-gear" style="color: var(--color-primary); margin-right: 8px;"></i>
+                            Configure Analysis
+                        </h3>
+
+                        <!-- Uploaded Files Display -->
+                        <div style="display: flex; flex-direction: column; gap: 6px; max-width: 75%;">
+                            <div
+                                style="display: flex; align-items: center; gap: 8px; background: rgba(229, 50, 45, 0.05); border: 1px solid rgba(229, 50, 45, 0.2); padding: 4px 10px; border-radius: 12px; font-size: 12px;">
+                                <i class="fa-solid fa-map" style="color: var(--color-primary);"></i>
+                                <span style="color: var(--color-primary); font-weight: 600;">Base:</span>
+                                <span id="file-name-a"
+                                    style="color: #2c3e50; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                    title="Selected file"></span>
+                            </div>
+                            <div
+                                style="display: flex; align-items: center; gap: 8px; background: rgba(51, 51, 51, 0.05); border: 1px solid rgba(51, 51, 51, 0.2); padding: 4px 10px; border-radius: 12px; font-size: 12px;">
+                                <i class="fa-solid fa-map-location-dot" style="color: #333;"></i>
+                                <span style="color: #333; font-weight: 600;">Target:</span>
+                                <span id="file-name-b"
+                                    style="color: #2c3e50; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                    title="Selected file"></span>
+                            </div>
+                        </div>
+                    </div>
 
                     <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
                         <label
