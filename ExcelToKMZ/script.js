@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnConvert = document.getElementById('btn-convert');
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
+    const progressDetails = document.getElementById('progress-details');
     const btnDownload = document.getElementById('btn-download');
     const btnRestart = document.getElementById('btn-restart');
     const resultSummary = document.getElementById('result-summary');
@@ -448,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                updateProgress(80, "Compressing to KMZ...");
+                updateProgress(80, "Compressing to KMZ...", `Converted ${results.validCount.toLocaleString()} rows`);
                 const zip = new JSZip();
                 zip.file("doc.kml", results.kml);
 
@@ -468,14 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     showView(resultView);
                     resultSummary.innerHTML = `
                         <div class="stat-box success">
-                            <span class="stat-value">${results.validCount}</span>
+                            <span class="stat-value">${results.validCount.toLocaleString()}</span>
                             <span class="stat-label">Converted</span>
                         </div>
                     `;
                     if (results.errorCount > 0) {
                         resultSummary.innerHTML += `
                             <div class="stat-box error">
-                                <span class="stat-value">${results.errorCount}</span>
+                                <span class="stat-value">${results.errorCount.toLocaleString()}</span>
                                 <span class="stat-label">Skipped</span>
                             </div>
                         `;
@@ -516,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         rows.forEach((row, i) => {
             // Update progress roughly
-            if (i % 200 === 0) updateProgress(10 + (i / total) * 30, "Parsing rows...");
+            if (i % 200 === 0) updateProgress(10 + (i / total) * 30, "Parsing rows...", `Processed ${i.toLocaleString()} / ${total.toLocaleString()} rows`);
 
             if (!row || row.length === 0 || row.every(cell => !cell)) return;
 
@@ -776,9 +777,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateProgress(percent, text) {
-        progressBar.style.width = `${percent}%`;
-        if (text) progressText.textContent = text;
+    function updateProgress(percent, text, details) {
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (progressText && text) progressText.innerText = text;
+        if (progressDetails) {
+            if (details) {
+                progressDetails.innerText = details;
+                progressDetails.style.display = 'block';
+            } else {
+                progressDetails.innerText = '';
+                progressDetails.style.display = 'none';
+            }
+        }
     }
 
     function resetApp() {

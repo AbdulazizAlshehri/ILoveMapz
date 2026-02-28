@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSelectB = document.getElementById('btn-select-b');
     const fileNameB = document.getElementById('file-name-b');
     const targetFilterInput = document.getElementById('target-filter'); // Filter Input
+    const filterColSelect = document.getElementById('filter-col-select');
+    const overlapColSelect = document.getElementById('overlap-col-select');
 
     const btnAnalyze = document.getElementById('btn-analyze');
 
@@ -104,6 +106,102 @@ document.addEventListener('DOMContentLoaded', () => {
                 const polygons = extractPolygons(geoJson);
                 displayEl.textContent = `${file.name} (${formatFileSize(file.size)}) | ${polygons.length} features`;
                 displayEl.title = displayEl.textContent;
+
+                // Populate dropdowns when Target (B) file is loaded
+                if (type === 'B' && geoJson && geoJson.features) {
+                    const cols = new Set();
+                    const allFeatures = geoJson.features;
+
+                    allFeatures.forEach(p => {
+                        if (!p.properties) return;
+
+                        // 1. Read standard properties (ExtendedData / SimpleData)
+                        const skip = ['styleUrl', 'styleHash', 'styleMapHash', 'stroke', 'stroke-width',
+                            'stroke-opacity', 'fill', 'fill-opacity', 'description', 'visibility'];
+                        Object.keys(p.properties).forEach(k => {
+                            if (!skip.includes(k)) cols.add(k);
+                        });
+
+                        // 2. Parse HTML table inside description balloon
+                        // (Many KMZ files store attributes as HTML tables in the description)
+                        const desc = p.properties.description || '';
+                        if (desc) {
+                            try {
+                                const domParser = new DOMParser();
+                                const doc = domParser.parseFromString(desc, 'text/html');
+
+                                // Generic Raw Text Extraction
+                                const rawText = doc.body.textContent.replace(/\s+/g, ' ').trim();
+                                if (rawText) {
+                                    p.properties['Description (Text)'] = rawText;
+                                    cols.add('Description (Text)');
+                                }
+
+                                // Format A: Tables (<tr><td>Key</td><td>Value</td></tr>)
+                                doc.querySelectorAll('tr').forEach(row => {
+                                    const cells = row.querySelectorAll('td, th');
+                                    if (cells.length >= 2) {
+                                        const key = cells[0].textContent.trim().replace(/:$/, '');
+                                        const val = cells[1].textContent.trim();
+                                        if (key && key.length < 50) {
+                                            cols.add(key);
+                                            p.properties[key] = val; // Store explicit pair
+                                        }
+                                    }
+                                });
+
+                                // Format B: Bold tags (<b>Key:</b> Value)
+                                doc.querySelectorAll('b, strong').forEach(b => {
+                                    const key = b.textContent.trim().replace(/:$/, '');
+                                    const valNode = b.nextSibling;
+                                    if (key && key.length < 50 && valNode) {
+                                        cols.add(key);
+                                        p.properties[key] = valNode.textContent.trim(); // Store explicit pair
+                                    }
+                                });
+
+                                // Format C: Simple string parsing (Key: Value<br>)
+                                const lines = desc.split(/<br\s*\/?>/i);
+                                lines.forEach(line => {
+                                    const parts = line.split(':');
+                                    if (parts.length >= 2) {
+                                        // Strip HTML tags
+                                        const cleanKey = parts[0].replace(/<[^>]+>/g, '').trim();
+                                        if (cleanKey && cleanKey.length > 0 && cleanKey.length < 50) {
+                                            cols.add(cleanKey);
+                                        }
+                                    }
+                                });
+                            } catch (_) { }
+                        }
+                    });
+
+                    // 'name' always appears first, then the rest alphabetically
+                    const colArr = ['name', ...Array.from(cols).filter(c => c !== 'name').sort()];
+
+                    // Populate Filter Column dropdown
+                    if (filterColSelect) {
+                        filterColSelect.innerHTML = '';
+                        colArr.forEach(col => {
+                            const opt = document.createElement('option');
+                            opt.value = col;
+                            opt.textContent = col === 'name' ? 'Name (Default)' : col;
+                            if (col === 'name') opt.selected = true;
+                            filterColSelect.appendChild(opt);
+                        });
+                    }
+
+                    // Populate Overlap Column dropdown
+                    if (overlapColSelect) {
+                        overlapColSelect.innerHTML = '<option value="">(None)</option>';
+                        colArr.filter(c => c !== 'name').forEach(col => {
+                            const opt = document.createElement('option');
+                            opt.value = col;
+                            opt.textContent = col;
+                            overlapColSelect.appendChild(opt);
+                        });
+                    }
+                }
             } catch (e) {
                 console.warn("Could not parse file for features count", e);
                 displayEl.textContent = `${file.name} (${formatFileSize(file.size)})`;
@@ -125,7 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateProgress(0, "Starting...", "Initializing processors");
 
         const jobId = JobTracker.start('KMZOverlap', [fileA, fileB]);
-
         try {
             // 1. Parse File A (Coverage Source)
             updateProgress(10, "Processing File A (Source)...", "Extracting KML/KMZ");
@@ -141,13 +238,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (polygonsB.length === 0) throw new Error("File B (Target) contains no valid polygons.");
 
+            const totalTargetLoaded = polygonsB.length; // save before filter
+
             // 2.1 Apply Filter if present
             const filterText = targetFilterInput ? targetFilterInput.value.toLowerCase().trim() : "";
+            const filterCol = filterColSelect ? filterColSelect.value : "name";
+            const overlapCol = overlapColSelect ? overlapColSelect.value : "";
             if (filterText) {
                 const initialCount = polygonsB.length;
                 polygonsB = polygonsB.filter(p => {
-                    const name = p.properties.name || "";
-                    return name.toLowerCase().includes(filterText);
+                    let val = p.properties[filterCol] || "";
+                    if (filterCol === "name" && !val && p.id) val = p.id;
+                    return String(val).toLowerCase() === filterText;
                 });
                 if (polygonsB.length === 0) {
                     throw new Error(`No Target polygons found matching filter "${filterText}". (Total in file: ${initialCount})`);
@@ -156,6 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 3. Analysis Loop: Iterate Target (B) and check overlap with Source (A)
+
             updateProgress(40, "Calculating Overlap...", `Analyzing ${polygonsB.length} target zones against ${polygonsA.length} source shapes`);
 
             const results = [];
@@ -171,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const chunk = polygonsB.slice(i, i + chunkSize);
 
                 chunk.forEach(targetPoly => {
-                    const res = processTargetFeature(targetPoly, polygonsA);
+                    const res = processTargetFeature(targetPoly, polygonsA, overlapCol);
                     results.push(res);
                 });
 
@@ -191,7 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
             JobTracker.finish(jobId, [new File([blob], outName)]);
 
             updateProgress(100, "Done!", "");
-            showStats(results, polygonsA.length);
+            showStats(results, polygonsA.length, overlapCol, {
+                totalTargetLoaded: totalTargetLoaded,
+                filteredCount: filterText ? polygonsB.length : null
+            });
             showView(resultView);
 
             // Auto-Download
@@ -230,7 +336,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const parser = new DOMParser();
         const kmlDom = parser.parseFromString(kmlText, "text/xml");
-        return toGeoJSON.kml(kmlDom);
+        const geojson = toGeoJSON.kml(kmlDom);
+
+        // --- Custom Extended Extractor ---
+        // tools like MapInfo generate <SimpleData> without a strict schema that toGeoJSON drops
+        // other tools use <Data> tags or <Snippet> tags that get lost.
+        try {
+            const placemarks = kmlDom.getElementsByTagName("Placemark");
+            if (placemarks && placemarks.length > 0) {
+                let featureIndex = 0;
+
+                for (let i = 0; i < placemarks.length; i++) {
+                    const pm = placemarks[i];
+
+                    // toGeoJSON only emits features for Placemarks with geometries
+                    const hasGeom = pm.getElementsByTagName('Polygon').length > 0 ||
+                        pm.getElementsByTagName('Point').length > 0 ||
+                        pm.getElementsByTagName('LineString').length > 0 ||
+                        pm.getElementsByTagName('MultiGeometry').length > 0 ||
+                        pm.getElementsByTagName('LinearRing').length > 0;
+
+                    if (hasGeom && featureIndex < geojson.features.length) {
+                        const feature = geojson.features[featureIndex];
+                        if (!feature.properties) feature.properties = {};
+
+                        // SimpleData
+                        const simpleDataElements = pm.getElementsByTagName("SimpleData");
+                        for (let j = 0; j < simpleDataElements.length; j++) {
+                            const sd = simpleDataElements[j];
+                            const name = sd.getAttribute("name");
+                            if (name) feature.properties[name] = sd.textContent || "";
+                        }
+
+                        // Standard Data
+                        const dataElements = pm.getElementsByTagName("Data");
+                        for (let j = 0; j < dataElements.length; j++) {
+                            const d = dataElements[j];
+                            const name = d.getAttribute("name");
+                            const valNode = d.getElementsByTagName("value")[0];
+                            if (name && valNode) feature.properties[name] = valNode.textContent || "";
+                        }
+
+                        // Snippet
+                        const snippet = pm.getElementsByTagName("Snippet")[0];
+                        if (snippet && snippet.textContent) {
+                            feature.properties["Snippet"] = snippet.textContent;
+                        }
+
+                        featureIndex++;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Could not parse XML fallback info", e);
+        }
+
+        return geojson;
     }
 
     function extractPolygons(geoJson) {
@@ -243,9 +404,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return polys;
     }
 
-    function processTargetFeature(targetFeature, sourceList) {
+    function processTargetFeature(targetFeature, sourceList, overlapCol) {
         // Prepare base properties from the Target Feature
         const props = { ...targetFeature.properties };
+
+        // Fallback for missing 'name' property but existing feature ID
+        if (!props.name && targetFeature.id) {
+            props.name = targetFeature.id;
+        }
 
         // Clean up internal KML props & Unwanted columns
         delete props.styleUrl;
@@ -309,14 +475,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalAreaKm = totalAreaSqM / 1_000_000;
             const coveredAreaKm = coveredAreaSqM / 1_000_000;
 
-            // Format for Excel
-            return {
+            const finalRow = {
                 ...props,
                 "Total_Area_km2": parseFloat(totalAreaKm.toFixed(6)),
                 "Covered_Area_km2": parseFloat(coveredAreaKm.toFixed(6)),
                 "Coverage_Percent": parseFloat(pct.toFixed(4)), // e.g. 0.5000
                 "Status": "Calculated"
             };
+
+            if (overlapCol && props[overlapCol]) {
+                const rawVal = parseFloat(props[overlapCol].replace(/[^\d.-]/g, '')) || 0;
+                finalRow[`Target_${overlapCol}`] = rawVal;
+                finalRow[`Overlapping_${overlapCol}`] = parseFloat((rawVal * pct).toFixed(4));
+            }
+
+            return finalRow;
 
         } catch (err) {
             console.error("Processing Error:", err);
@@ -375,23 +548,106 @@ document.addEventListener('DOMContentLoaded', () => {
         if (details) progressDetails.innerText = details;
     }
 
-    function showStats(results, sourceCount) {
-        // Average multiplied by 100 purely for UI text display, NOT for Excel
-        const avg = results.reduce((acc, r) => acc + (r.Coverage_Percent || 0), 0) / (results.length || 1);
+    function showStats(results, sourceCount, overlapCol, ctx) {
+        ctx = ctx || {};
+        const fmt = function (n) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
+        const totalTargetLoaded = ctx.totalTargetLoaded != null ? ctx.totalTargetLoaded : results.length;
+        const filteredCount = ctx.filteredCount != null ? ctx.filteredCount : null;
+        const avg = results.reduce(function (acc, r) { return acc + (r.Coverage_Percent || 0); }, 0) / (results.length || 1);
+        const totalCovered = results.reduce(function (acc, r) { return acc + (r.Covered_Area_km2 || 0); }, 0);
 
-        resultSummary.innerHTML = `
-            <div class="stat-box neutral">
-                <span class="stat-value">${results.length}</span>
-                <span class="stat-label">Targets Analyzed</span>
-            </div>
-            <div class="stat-box neutral">
-                <span class="stat-value">${sourceCount}</span>
-                <span class="stat-label">Source Polygons</span>
-            </div>
-            <div class="stat-box success">
-                <span class="stat-value">${(avg * 100).toFixed(2)}%</span>
-                <span class="stat-label">Avg Coverage</span>
-            </div>
-        `;
+        // Make the view wide enough to comfortably fit the pipeline
+        resultView.style.maxWidth = '100%';
+        resultSummary.style.maxWidth = '100%'; // Override shared.css 600px restriction
+        resultSummary.style.display = 'block'; // Override shared.css flex
+
+        // Helper for floating arrows between grid columns
+        const arrowHtml = (color) => `<div style="position:absolute; right:-30px; top:50%; transform:translateY(-50%); font-size:20px; color:${color};"><i class="fa-solid fa-arrow-right-long"></i></div>`;
+
+        var html = '<div style="display:grid; grid-template-rows: 1fr 1fr; grid-auto-columns: minmax(240px, 1fr); gap: 20px 40px; width:100%; overflow-x:auto; padding: 10px 30px 20px 10px;">';
+
+        let col = 1;
+
+        // ==========================================
+        // STAGE 1: Upload (Col 1)
+        // ==========================================
+        // 1. Base Layer Status (Row 1)
+        html += `<div class="flow-stage" style="grid-row: 1; grid-column: ${col}; margin:0; border-left:4px solid var(--color-primary); background:#fff; position:relative;">`;
+        html += '<div class="flow-stage-icon"><i class="fa-solid fa-map" style="color: var(--color-primary);"></i></div>';
+        html += '<div class="flow-stage-items" style="flex:1;">';
+        html += '<div class="flow-stage-label" style="border:none; margin:0;" title="The polygon geometry that serves as the boundary bounds.">Base Layer (Source)</div>';
+        html += '<div class="flow-item"><span class="flow-item-value" style="color:var(--color-primary);">' + fmt(sourceCount) + '</span><span class="flow-item-sub">Polygons</span></div>';
+        html += '</div>';
+        html += arrowHtml('var(--color-primary)'); // Arrow to Col 2
+        html += '</div>';
+
+        // 2. Target Layer Status (Row 2)
+        html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #333; background:#fff; position:relative;">`;
+        html += '<div class="flow-stage-icon"><i class="fa-solid fa-map-location-dot" style="color: #333;"></i></div>';
+        html += '<div class="flow-stage-items" style="flex:1;">';
+        html += '<div class="flow-stage-label" style="border:none; margin:0;">Target Layer (Data)</div>';
+        html += '<div class="flow-item"><span class="flow-item-value" style="color:#333;">' + fmt(totalTargetLoaded) + '</span><span class="flow-item-sub">Analyzed</span></div>';
+        html += '</div>';
+        html += arrowHtml('#333'); // Arrow to Col 2
+        html += '</div>';
+
+        col++;
+
+        // ==========================================
+        // STAGE 2: Area / Filters (Col 2)
+        // ==========================================
+        // 1. Base Layer Outcome - Area Covered (Row 1)
+        html += `<div class="flow-stage" style="grid-row: 1; grid-column: ${col}; margin:0; border-left:4px solid #2ecc71; background:#fff; position:relative;">`;
+        html += '<div class="flow-stage-icon"><i class="fa-solid fa-draw-polygon" style="color: #2ecc71;"></i></div>';
+        html += '<div class="flow-stage-items" style="flex:1;">';
+        html += '<div class="flow-stage-label" style="border:none; margin:0;" title="The total physical area from the Base Layer that landed on valid Targets.">Union Area Covered</div>';
+        html += '<div class="flow-item"><span class="flow-item-value" style="color:#2c3e50;">' + fmt(totalCovered) + ' <span style="font-size:12px;">km²</span></span><span class="flow-item-sub">Total Spanned</span></div>';
+        html += '</div></div>';
+
+        // 2. Target Filter Result (Row 2)
+        if (filteredCount !== null) {
+            html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #f39c12; background:#fff; position:relative;">`;
+            html += '<div class="flow-stage-icon"><i class="fa-solid fa-filter" style="color: #f39c12;"></i></div>';
+            html += '<div class="flow-stage-items" style="flex:1;">';
+            html += '<div class="flow-stage-label" style="border:none; margin:0;">Filtered</div>';
+            html += '<div class="flow-item"><span class="flow-item-value" style="color:#f39c12;">' + fmt(filteredCount) + '</span><span class="flow-item-sub">Matches Surviving</span></div>';
+            html += '</div>';
+            html += arrowHtml('#333');
+            html += '</div>';
+            col++;
+        }
+
+        // ==========================================
+        // STAGE 3: Overlap Coverage (Col 3)
+        // ==========================================
+        html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #27ae60; background:#fff; position:relative;">`;
+        html += '<div class="flow-stage-icon"><i class="fa-solid fa-percentage" style="color: #27ae60;"></i></div>';
+        html += '<div class="flow-stage-items" style="flex:1;">';
+        html += '<div class="flow-stage-label" style="border:none; margin:0;">Target Coverage</div>';
+        html += '<div class="flow-item"><span class="flow-item-value" style="color:#27ae60;">' + (avg * 100).toFixed(2) + '%</span><span class="flow-item-sub">Avg Hit Per Target</span></div>';
+        html += '</div>';
+        if (overlapCol) html += arrowHtml('#333');
+        html += '</div>';
+
+        // ==========================================
+        // STAGE 4: Math Extraction (Col 4)
+        // ==========================================
+        if (overlapCol) {
+            col++;
+            var sumCol = results.reduce(function (acc, r) { return acc + (r['Target_' + overlapCol] || 0); }, 0);
+            var sumOverlapCol = results.reduce(function (acc, r) { return acc + (r['Overlapping_' + overlapCol] || 0); }, 0);
+            var colPct = sumCol > 0 ? (sumOverlapCol / sumCol * 100).toFixed(2) + '%' : '—';
+
+            html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #8e44ad; background:#fff; position:relative;">`;
+            html += '<div class="flow-stage-icon"><i class="fa-solid fa-calculator" style="color:#8e44ad;"></i></div>';
+            html += '<div class="flow-stage-items" style="flex:1;">';
+            html += '<div class="flow-stage-label" style="border:none; margin:0;" title="' + overlapCol + '">' + (overlapCol.length > 18 ? overlapCol.substring(0, 18) + '...' : overlapCol) + '</div>';
+            html += '<div class="flow-item"><span class="flow-item-value" style="color:#8e44ad;">' + fmt(sumOverlapCol) + '</span><span class="flow-item-sub">Values Captured (' + colPct + ')</span></div>';
+            html += '</div></div>';
+        }
+
+        html += '</div>'; // End Grid Wrapper
+
+        resultSummary.innerHTML = html;
     }
 });

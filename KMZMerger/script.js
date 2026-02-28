@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRestart = document.getElementById('btn-restart');
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
+    const progressDetails = document.getElementById('progress-details');
     const resultSummary = document.getElementById('result-summary');
 
     let currentFiles = [];
@@ -54,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Simulate logic
         setTimeout(() => {
             try {
-                updateProgress(50, 'Processing data...');
+                updateProgress(50, 'Processing data...', `Merging files... (${currentFiles.length} item(s))`);
 
                 // --- Business Logic Goes Here ---
 
@@ -70,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (resultSummary) {
                     resultSummary.innerHTML = `
                         <div class="stat-box success">
-                            <span class="stat-value">${currentFiles.length}</span>
+                            <span class="stat-value">${currentFiles.length.toLocaleString()}</span>
                             <span class="stat-label">Files Merged</span>
                         </div>
                     `;
@@ -111,9 +112,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateProgress(percent, text) {
+    function updateProgress(percent, text, details) {
         if (progressBar) progressBar.style.width = `${percent}%`;
         if (progressText && text) progressText.innerText = text;
+        if (progressDetails) {
+            if (details) {
+                progressDetails.innerText = details;
+                progressDetails.style.display = 'block';
+            } else {
+                progressDetails.innerText = '';
+                progressDetails.style.display = 'none';
+            }
+        }
     }
 
     function resetApp() {

@@ -132,11 +132,125 @@ body {
     padding: 20px 8px;
 }
 
-.layer-item {
+/* ── Feature Search ─────────────────────────────────────────────── */
+.search-wrap {
+    padding: 6px 8px 4px;
+    border-bottom: 1px solid #f0f0f0;
+    position: relative;
+}
+
+.search-input-wrap {
     display: flex;
     align-items: center;
+    background: #f7f7f7;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    padding: 0 8px;
     gap: 6px;
-    padding: 7px 6px;
+    transition: border-color 0.15s;
+}
+
+.search-input-wrap:focus-within {
+    border-color: var(--color-primary);
+    background: #fff;
+}
+
+.search-icon {
+    color: #bbb;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 6px 0;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    color: #2c3e50;
+    outline: none;
+    min-width: 0;
+}
+
+.search-input::placeholder {
+    color: #bbb;
+}
+
+.search-results {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: calc(100% - 4px);
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    z-index: 2000;
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.search-results.hidden {
+    display: none;
+}
+
+.search-result-item {
+    display: flex;
+    flex-direction: column;
+    padding: 7px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #f5f5f5;
+    transition: background 0.1s;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: #fff8f8;
+}
+
+.search-result-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: #2c3e50;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-result-name mark {
+    background: rgba(231, 76, 60, 0.15);
+    color: var(--color-primary);
+    border-radius: 2px;
+    font-weight: 700;
+    padding: 0 1px;
+}
+
+.search-result-layer {
+    font-size: 10px;
+    color: #aaa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+}
+
+.search-no-result {
+    padding: 10px;
+    font-size: 12px;
+    color: #bbb;
+    text-align: center;
+}
+
+.layer-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 6px 6px 4px;
     border-radius: 6px;
     margin-bottom: 3px;
     background: #fafafa;
@@ -144,21 +258,224 @@ body {
     transition: background 0.15s;
 }
 
+/* Main row: drag handle + name/meta + target/remove buttons */
+.layer-main-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.layer-info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.layer-meta {
+    font-size: 10px;
+    color: #999;
+}
+
+/* Top-right action buttons (target + remove only) */
+.layer-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+/* Controls row: swatch, reset, divider, 6 pips */
+.layer-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding-top: 5px;
+    padding-left: 14px;
+    /* indent to align under the name (past the grip) */
+}
+
+/* Thin vertical divider between reset and pips */
+.layer-ctrl-divider {
+    width: 1px;
+    height: 10px;
+    background: #e0e0e0;
+    flex-shrink: 0;
+    border-radius: 1px;
+}
+
+/* Pip container */
+.opacity-pips {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* All pips share base */
+.opacity-pip {
+    border-radius: 50%;
+    border: 1.5px solid #ccc;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: border-color 0.15s, transform 0.12s, background 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* pip 1: hide/eye button — icon style */
+.opacity-pip.hide-pip {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: #f0f0f0;
+    border-color: #ddd;
+    color: #aaa;
+    font-size: 8px;
+}
+
+.opacity-pip.hide-pip:hover {
+    background: #e8e8e8;
+    color: #888;
+}
+
+.opacity-pip.hide-pip.active {
+    background: #fff0f0;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* pips 2–6: graduated opacity dots */
+.opacity-pip:nth-child(2) {
+    width: 5px;
+    height: 5px;
+    background: rgba(0, 0, 0, 0.15);
+    border-color: #ccc;
+}
+
+.opacity-pip:nth-child(3) {
+    width: 6px;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.30);
+    border-color: #bbb;
+}
+
+.opacity-pip:nth-child(4) {
+    width: 7px;
+    height: 7px;
+    background: rgba(0, 0, 0, 0.50);
+    border-color: #aaa;
+}
+
+.opacity-pip:nth-child(5) {
+    width: 8px;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.70);
+    border-color: #888;
+}
+
+.opacity-pip:nth-child(6) {
+    width: 9px;
+    height: 9px;
+    background: rgba(0, 0, 0, 0.90);
+    border-color: #555;
+}
+
+.opacity-pip:nth-child(n+2):hover {
+    transform: scale(1.3);
+}
+
+.opacity-pip:nth-child(n+2).active {
+    border-color: var(--color-primary);
+    outline: 2px solid rgba(229, 50, 45, 0.35);
+    outline-offset: 1px;
+}
+
 .layer-item:hover {
     background: #f5f5f5;
 }
 
 .layer-item.is-target {
-    border-color: var(--color-primary);
     background: #fff8f8;
+    box-shadow: 0 0 0 1.5px var(--color-primary) inset;
 }
 
-.layer-swatch {
+/* Drag-and-drop reordering */
+.layer-drag-handle {
+    cursor: grab;
+    color: #ccc;
+    font-size: 11px;
+    padding: 0 2px 0 0;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: color 0.15s;
+}
+
+.layer-item:hover .layer-drag-handle {
+    color: #aaa;
+}
+
+.layer-drag-handle:active {
+    cursor: grabbing;
+}
+
+.layer-item.dragging {
+    opacity: 0.4;
+    border-style: dashed;
+}
+
+.layer-item.drop-target {
+    border-color: var(--color-primary);
+    background: rgba(231, 76, 60, 0.05);
+    box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.15);
+}
+
+/* Color-picker swatch — same size as original 10px dot */
+.layer-color-swatch {
     width: 10px;
     height: 10px;
     border-radius: 50%;
+    border: 1.5px solid rgba(0, 0, 0, 0.12);
+    padding: 0;
+    cursor: pointer;
     flex-shrink: 0;
-    border: 2px solid rgba(0, 0, 0, 0.08);
+    -webkit-appearance: none;
+    appearance: none;
+    overflow: hidden;
+    display: block;
+}
+
+.layer-color-swatch::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.layer-color-swatch::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
+}
+
+.layer-color-swatch::-moz-color-swatch {
+    border: none;
+    border-radius: 50%;
+}
+
+/* Tiny reset-to-original-color button next to swatch */
+.btn-reset-color {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 9px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s;
+    display: flex;
+    align-items: center;
+}
+
+.btn-reset-color:hover {
+    color: #888;
 }
 
 .layer-name {
@@ -373,6 +690,94 @@ body {
     }
 }
 
+/* ── KMZ Loading Toast (bottom-right corner) ──────────────────── */
+#kmz-loading-overlay {
+    position: absolute;
+    bottom: 20px;
+    right: 16px;
+    z-index: 10000;
+    width: 240px;
+    background: rgba(24, 28, 36, 0.92);
+    color: #fff;
+    border-radius: 10px;
+    padding: 12px 14px 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: opacity 0.2s, transform 0.2s;
+    transform: translateY(0);
+}
+
+#kmz-loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+}
+
+.kmz-loading-filename {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.95;
+}
+
+.kmz-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kmz-progress-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.kmz-progress-bar {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.12s ease;
+}
+
+.kmz-progress-bar.indeterminate {
+    width: 35% !important;
+    animation: kmzIndeterminate 1s ease-in-out infinite;
+}
+
+@keyframes kmzIndeterminate {
+    0% {
+        transform: translateX(-120%);
+    }
+
+    100% {
+        transform: translateX(400%);
+    }
+}
+
+.kmz-loading-pct {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-primary);
+    min-width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.kmz-loading-status {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* ── Imagery Date Display ────────────────────────────────────── */
 #imagery-date-display {
     position: absolute;
@@ -390,4 +795,70 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(2px);
     transition: opacity 0.3s;
+}
+
+/* ── Custom static mini-map ──────────────────────────────────── */
+#mini-map-panel {
+    position: absolute;
+    bottom: 24px;
+    right: 12px;
+    width: 170px;
+    height: 130px;
+    z-index: 2000;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 3px 16px rgba(0, 0, 0, 0.28);
+    border: 2.5px solid white;
+    /* Animate width and height for collapse/expand */
+    transition: width 0.5s ease, height 0.5s ease;
+    display: none;
+    /* hidden until layer loads optionally */
+}
+
+/* Collapsed: panel shrinks to just the square button size */
+#mini-map-panel.collapsed {
+    width: 30px;
+    height: 30px;
+}
+
+#mini-map-container {
+    width: 100%;
+    height: 100%;
+}
+
+/* Blocker: swallows all mouse events so the map is read-only */
+#mini-map-blocker {
+    position: absolute;
+    inset: 0;
+    z-index: 9999;
+    background: transparent;
+    cursor: default;
+}
+
+/* Toggle button: inside the panel at bottom-right, square */
+#mini-map-toggle-btn {
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
+    z-index: 10000;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px 0 0 0;
+    background: rgba(255, 255, 255, 0.92);
+    border: none;
+    border-top: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+    cursor: pointer;
+    font-size: 13px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+}
+
+#mini-map-toggle-btn:hover {
+    background: white;
+    color: var(--color-primary);
 }

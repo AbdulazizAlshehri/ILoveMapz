@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
+    const progressDetails = document.getElementById('progress-details');
     const resultSummary = document.getElementById('result-summary');
 
     // State
@@ -186,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error("No valid coordinates found in file.");
                 }
 
-                updateProgress(80, "Compressing KMZ...");
+                updateProgress(80, "Compressing KMZ...", `Generated ${results.count.toLocaleString()} sites`);
                 const zip = new JSZip();
                 zip.file("doc.kml", results.kml);
 
@@ -199,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (resultSummary) {
                     resultSummary.innerHTML = `
                         <div class="stat-box success">
-                            <span class="stat-value">${results.count}</span>
+                            <span class="stat-value">${results.count.toLocaleString()}</span>
                             <span class="stat-label">Sites Generated</span>
                         </div>
                     `;
@@ -362,9 +363,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateProgress(percent, text) {
-        progressBar.style.width = `${percent}%`;
-        if (text) progressText.innerText = text;
+    function updateProgress(percent, text, details) {
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (progressText && text) progressText.innerText = text;
+        if (progressDetails) {
+            if (details) {
+                progressDetails.innerText = details;
+                progressDetails.style.display = 'block';
+            } else {
+                progressDetails.innerText = '';
+                progressDetails.style.display = 'none';
+            }
+        }
     }
 
     function resetApp() {

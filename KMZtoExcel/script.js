@@ -7,6 +7,7 @@ const btnDownload = document.getElementById('btn-download');
 const btnRestart = document.getElementById('btn-restart');
 const progressBar = document.getElementById('progress-bar');
 const progressText = document.getElementById('progress-text');
+const progressDetails = document.getElementById('progress-details');
 const resultSummary = document.getElementById('result-summary');
 
 // Views
@@ -114,9 +115,18 @@ function showView(view) {
     }
 }
 
-function updateProgress(percent, text) {
-    progressBar.style.width = `${percent}%`;
-    if (text) progressText.textContent = text;
+function updateProgress(percent, text, details) {
+    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (progressText && text) progressText.innerText = text;
+    if (progressDetails) {
+        if (details) {
+            progressDetails.innerText = details;
+            progressDetails.style.display = 'block';
+        } else {
+            progressDetails.innerText = '';
+            progressDetails.style.display = 'none';
+        }
+    }
 }
 
 async function startConversion(file) {
@@ -153,13 +163,11 @@ async function startConversion(file) {
             if (placemarks.length === 0) {
                 alert("No placemarks found in this file.");
                 JobTracker.fail(jobId, "No placemarks found");
-                alert("No placemarks found in this file.");
-                JobTracker.fail(jobId, "No placemarks found");
                 resetApp();
                 return;
             }
 
-            updateProgress(80, "Generating Excel...");
+            updateProgress(80, "Generating Excel...", `Parsed ${placemarks.length.toLocaleString()} placemarks`);
             const generatedBlob = generateExcel(placemarks, file.name);
 
             // FINISH JOB
@@ -276,7 +284,12 @@ function generateExcel(data, originalFileName) {
     updateProgress(100, "Done!");
     setTimeout(() => {
         showView(resultView);
-        resultSummary.textContent = `Successfully extracted ${data.length} placemarks.`;
+        resultSummary.innerHTML = `
+            <div class="stat-box success">
+                <span class="stat-value">${data.length.toLocaleString()}</span>
+                <span class="stat-label">Extracted</span>
+            </div>
+        `;
 
         // Auto-download on success
         if (generatedExcelBlob) {

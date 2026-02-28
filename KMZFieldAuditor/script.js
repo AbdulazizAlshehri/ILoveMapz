@@ -59,6 +59,8 @@ const fileInputNav = document.getElementById('file-input-nav');
 // export button
 const btnExport = document.getElementById('btn-export');
 
+
+
 // ─── Core Hooks ───────────────────────────────────────────────────
 // Called by kmz_core.js when KMZ files are loaded
 window.onKmzLoaded = function () {
@@ -84,7 +86,6 @@ window.onTargetLayerSet = function (id) {
     }
 
     // Return true if we handled the zoom (so core doesn't double-zoom)
-    // If we didn't find/zoom to a feature, let core zoom to layer
     return zoomedToFeature;
 };
 
@@ -130,6 +131,7 @@ inpNoteCol.addEventListener('change', () => {
     noteColNameSpan.textContent = noteColName;
     saveSession();
 });
+
 
 // Navigation
 btnPrev.addEventListener('click', () => navigateTo(currentRow - 1));
@@ -296,53 +298,69 @@ function renderAuditRow() {
 }
 
 // ─── Feature Zoom + Highlight ─────────────────────────────────────
+// Scores a candidate feature name against the lookup value:
+//   3 = exact match, 2 = feature starts with lookup, 1 = feature contains lookup, 0 = no match
+function matchScore(featureName, lookup) {
+    if (featureName === lookup) return 3;
+    if (featureName.startsWith(lookup)) return 2;
+    if (featureName.includes(lookup)) return 1;
+    return 0;
+}
+
 function zoomToFeature(name) {
     if (!name || targetLayerId === null) return false;
     const entry = layers[targetLayerId];
     if (!entry) return false;
 
     const nameLower = name.toLowerCase();
-    let found = false;
-
     if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
 
-    entry.layer.eachLayer(lyr => {
-        if (found) return;
-        const featureName = String(lyr.feature?.properties?.name ?? '').trim().toLowerCase();
-        if (featureName === nameLower) {
-            found = true;
-            try {
-                const b = lyr.getBounds ? lyr.getBounds() : null;
-                if (b && b.isValid()) {
-                    map.fitBounds(b, { padding: [60, 60], maxZoom: 16 });
-                } else if (lyr.getLatLng) {
-                    map.setView(lyr.getLatLng(), 14);
-                }
-            } catch (_) { }
+    // Collect all candidates scored by match quality, then pick the best.
+    // entry.layer is L.featureGroup → chunk L.geoJSON layers → individual features.
+    let bestScore = 0;
+    let bestLyr = null;
 
-            try {
-                const feat = lyr.feature;
-                if (feat) {
-                    // Breathing yellow circle highlight
-                    const pulseIcon = L.divIcon({
-                        className: '',
-                        html: '<div class="pulse-ring"></div>',
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 20]
-                    });
-                    highlightLayer = L.geoJSON(feat, {
-                        style: {
-                            color: '#f1c40f', weight: 3, opacity: 0.9,
-                            fillColor: '#f1c40f', fillOpacity: 0.2
-                        },
-                        pointToLayer: (f, ll) => L.marker(ll, { icon: pulseIcon })
-                    }).addTo(map);
-                }
-            } catch (_) { }
-        }
+    entry.layer.eachLayer(chunk => {
+        if (!chunk.eachLayer) return;
+        chunk.eachLayer(lyr => {
+            const featureName = String(lyr.feature?.properties?.name ?? '').trim().toLowerCase();
+            if (!featureName) return;
+            const score = matchScore(featureName, nameLower);
+            // Prefer higher score; on tie prefer shorter (more specific) feature name
+            if (score > bestScore || (score === bestScore && score > 0 && featureName.length < String(bestLyr?.feature?.properties?.name ?? '').trim().toLowerCase().length)) {
+                bestScore = score;
+                bestLyr = lyr;
+            }
+        });
     });
 
-    return found;
+    if (!bestLyr || bestScore === 0) return false;
+
+    try {
+        const b = bestLyr.getBounds ? bestLyr.getBounds() : null;
+        if (b && b.isValid()) {
+            map.fitBounds(b, { padding: [60, 60], maxZoom: 16 });
+        } else if (bestLyr.getLatLng) {
+            map.setView(bestLyr.getLatLng(), 14);
+        }
+    } catch (_) { }
+
+    try {
+        const feat = bestLyr.feature;
+        if (feat) {
+            const pulseIcon = L.divIcon({
+                className: '',
+                html: '<div class="pulse-ring"></div>',
+                iconSize: [40, 40], iconAnchor: [20, 20]
+            });
+            highlightLayer = L.geoJSON(feat, {
+                style: { color: '#f1c40f', weight: 3, opacity: 0.9, fillColor: '#f1c40f', fillOpacity: 0.2 },
+                pointToLayer: (f, ll) => L.marker(ll, { icon: pulseIcon })
+            }).addTo(map);
+        }
+    } catch (_) { }
+
+    return true;
 }
 
 // ─── Progress ─────────────────────────────────────────────────────

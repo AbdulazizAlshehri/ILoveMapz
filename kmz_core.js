@@ -3,8 +3,9 @@
 // ═══════════════════════════════════════════════════════════════════
 
 // ─── Color Palette ────────────────────────────────────────────────
+// NOTE: All colors must be valid hex/rgb — Canvas 2D cannot parse CSS variables.
 const LAYER_COLORS = [
-    'var(--color-primary)', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+    '#E5322D', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
     '#1abc9c', '#e67e22', '#34495e', '#e91e63', '#00bcd4'
 ];
 let colorIndex = 0;
@@ -27,15 +28,45 @@ function makePinIcon(color) {
 }
 
 // ─── Map Setup ────────────────────────────────────────────────────
+// Tile options: updateWhenIdle waits for panning to stop before loading,
+// updateWhenZooming skips intermediate zoom levels, keepBuffer pre-caches
+// off-screen tiles so back-panning feels instant.
+const TILE_OPTIONS = {
+    maxZoom: 19,
+    keepBuffer: 2,
+    updateWhenIdle: true,
+    updateWhenZooming: false
+};
 const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '© OpenStreetMap'
+    ...TILE_OPTIONS, attribution: '© OpenStreetMap'
 });
 const satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { maxZoom: 19, attribution: 'Tiles © Esri' }
+    { ...TILE_OPTIONS, attribution: 'Tiles © Esri' }
 );
-const map = L.map('map', { layers: [osmLayer] }).setView([23.8859, 45.0792], 5);
+// preferCanvas + smooth movement options:
+//   zoomSnap: 0.25  — fractional zoom steps, no jarring snapping
+//   wheelDebounceTime: 40 — scroll-wheel zoom is less sensitive/jumpy
+//   inertiaDeceleration/MaxSpeed — feels like smooth, natural pan deceleration
+const map = L.map('map', {
+    layers: [osmLayer],
+    preferCanvas: true,
+    zoomSnap: 0.25,
+    wheelDebounceTime: 40,
+    inertia: true,
+    inertiaDeceleration: 3000,
+    inertiaMaxSpeed: 1500
+}).setView([23.8859, 45.0792], 5);
 L.control.layers({ 'Streets': osmLayer, 'Satellite': satelliteLayer }).addTo(map);
+
+// GPU compositing hint — tells the browser to promote the canvas to its own
+// compositor layer so panning is hardware-accelerated with no layout reflow.
+map.once('load', () => {
+    const canvasPanes = map.getContainer().querySelectorAll('.leaflet-canvas-pane, .leaflet-tile-pane');
+    canvasPanes.forEach(el => el.style.willChange = 'transform');
+});
+// Also apply after first layer loads (map 'load' may not fire for local files)
+map.getContainer().style.willChange = 'transform';
 
 // ─── State ────────────────────────────────────────────────────────
 const layers = {};
@@ -43,6 +74,17 @@ let layerIdCounter = 0;
 let targetLayerId = null;
 let highlightLayer = null;
 let lastMouseLatLng = null; // Track mouse position for 'I' key lookup
+let featureIndex = [];  // { name, lyr, center, layerId } — powers the search box
+
+// ─── Shared Canvas Renderer ───────────────────────────────────────
+// A single shared renderer is used for ALL layers so that all features
+// share one canvas element. Using a separate L.canvas() per file would
+// stack opaque canvases on top of each other, making lower-layer
+// polygons unclickable because the upper canvas intercepts all events.
+// padding: 1.0 means the canvas is pre-drawn 1× viewport width/height beyond
+// every edge. During a pan, Leaflet just CSS-transforms the canvas — no redraw
+// until you've moved an entire viewport width. Doubles the smooth-pan range.
+const sharedCanvasRenderer = L.canvas({ padding: 1.0 });
 
 // ─── DOM ──────────────────────────────────────────────────────────
 const sidebar = document.getElementById('layer-sidebar');
@@ -52,6 +94,56 @@ const mapWrap = document.getElementById('map-wrap');
 const featureFlash = document.getElementById('feature-flash');
 const navLayerCount = document.getElementById('nav-layer-count');
 const navCountNum = document.getElementById('nav-count-num');
+
+// ─── Loading Toast (bottom-right corner) ──────────────────────────
+// Small non-intrusive toast — no spinner, just filename + progress bar + %
+const _loadingOverlay = document.createElement('div');
+_loadingOverlay.id = 'kmz-loading-overlay';
+_loadingOverlay.className = 'hidden';
+_loadingOverlay.innerHTML = `
+    <div class="kmz-loading-filename" id="_lof">Loading…</div>
+    <div class="kmz-progress-row">
+        <div class="kmz-progress-track">
+            <div class="kmz-progress-bar indeterminate" id="_lob"></div>
+        </div>
+        <span class="kmz-loading-pct" id="_lop">—</span>
+    </div>
+    <div class="kmz-loading-status" id="_los"></div>`;
+if (mapWrap) mapWrap.appendChild(_loadingOverlay);
+
+const _loFilename = () => document.getElementById('_lof');
+const _loBar = () => document.getElementById('_lob');
+const _loPct = () => document.getElementById('_lop');
+const _loStatus = () => document.getElementById('_los');
+
+function showLoadingOverlay(filename) {
+    const bar = _loBar();
+    if (bar) { bar.style.width = '0%'; bar.classList.add('indeterminate'); }
+    if (_loFilename()) _loFilename().textContent = filename;
+    if (_loPct()) _loPct().textContent = '—';
+    if (_loStatus()) _loStatus().textContent = 'Parsing…';
+    _loadingOverlay.classList.remove('hidden');
+}
+
+function updateLoadingProgress(loaded, total, label) {
+    const bar = _loBar();
+    if (!bar) return;
+    if (total > 0) {
+        const pct = Math.round((loaded / total) * 100);
+        bar.classList.remove('indeterminate');
+        bar.style.width = `${pct}%`;
+        if (_loPct()) _loPct().textContent = `${pct}%`;
+    }
+    if (_loStatus()) _loStatus().textContent = label || '';
+}
+
+function hideLoadingOverlay() {
+    _loadingOverlay.classList.add('hidden');
+    const bar = _loBar();
+    if (bar) { bar.style.width = '0%'; bar.classList.add('indeterminate'); }
+    if (_loPct()) _loPct().textContent = '—';
+    if (_loStatus()) _loStatus().textContent = '';
+}
 
 // ─── Custom Canvas Pin Renderer ───────────────────────────────────
 // High-performance "Teardrop" pin drawn directly on Canvas
@@ -104,6 +196,7 @@ async function handleKmzFiles(files) {
 
 async function processKmzFile(file) {
     const jobId = window.JobTracker?.start('KMZProcessing', [file]);
+    showLoadingOverlay(file.name);
     try {
         const buffer = await file.arrayBuffer();
         let kmlText = '';
@@ -117,16 +210,20 @@ async function processKmzFile(file) {
         if (!kmlText) throw new Error('No KML content found');
 
         const kmlDom = new DOMParser().parseFromString(kmlText, 'text/xml');
+
+
         const geoJson = toGeoJSON.kml(kmlDom);
         const color = nextColor();
+        const features = geoJson.features || [];
+        const total = features.length;
 
         const counts = { Point: 0, LineString: 0, Polygon: 0 };
-        const canvasRenderer = L.canvas();
+        const newFeatureEntries = []; // collect { name, lyr, center } for search index
 
-        const layer = L.geoJSON(geoJson, {
-            renderer: canvasRenderer, // Use Canvas for lines/polygons
+        // GeoJSON layer options shared across all chunks
+        const geoJsonOptions = {
+            renderer: sharedCanvasRenderer,
             onEachFeature(feature, lyr) {
-                // Count geometry types
                 const type = feature.geometry?.type;
                 if (type === 'Point' || type === 'MultiPoint') counts.Point++;
                 else if (type === 'LineString' || type === 'MultiLineString') counts.LineString++;
@@ -137,17 +234,24 @@ async function processKmzFile(file) {
                 if (p.name) popup += `<strong>${p.name}</strong>`;
                 if (p.description) popup += `<div style="margin-top:4px;font-size:12px;">${p.description}</div>`;
                 if (popup) lyr.bindPopup(popup);
+
+                // Add named features to the search index
+                if (p.name) {
+                    try {
+                        const center = lyr.getLatLng ? lyr.getLatLng()
+                            : lyr.getBounds ? lyr.getBounds().getCenter()
+                                : null;
+                        if (center) newFeatureEntries.push({ name: p.name, lyr, center });
+                    } catch (_) { }
+                }
             },
             pointToLayer(feature, latlng) {
-                // Use custom Canvas PinMarker
                 return new PinMarker(latlng, {
-                    renderer: canvasRenderer,
-                    radius: 6, // Used for hit detection
+                    renderer: sharedCanvasRenderer,
+                    radius: 6,
                     fillColor: color,
                     color: 'rgba(0,0,0,0.5)',
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 1
+                    weight: 1, opacity: 1, fillOpacity: 1
                 });
             },
             style(feature) {
@@ -160,29 +264,71 @@ async function processKmzFile(file) {
                     fillOpacity: p['fill-opacity'] || 0.4
                 };
             }
-        }).addTo(map);
+        };
+
+        // Chunked rendering: yield between chunks via rAF so the browser
+        // can repaint the progress bar and stay responsive during large files.
+        const CHUNK = 300;
+        const layer = L.featureGroup().addTo(map);
+        const kmlChunks = []; // keep refs so resetLayerColor can call resetStyle()
+        updateLoadingProgress(0, total, total ? `0 / ${total} features` : 'Rendering…');
+
+        for (let i = 0; i < features.length; i += CHUNK) {
+            const chunk = { type: 'FeatureCollection', features: features.slice(i, i + CHUNK) };
+            const chunkLayer = L.geoJSON(chunk, geoJsonOptions);
+            chunkLayer.addTo(layer);
+            kmlChunks.push(chunkLayer);
+
+            const loaded = Math.min(i + CHUNK, total);
+            updateLoadingProgress(loaded, total, total ? `${loaded} / ${total} features` : 'Rendering…');
+
+            // Yield so the browser stays responsive — setTimeout(0) unlike
+            // requestAnimationFrame continues firing even in background tabs.
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
 
         const bounds = layer.getBounds();
         if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
 
         const id = ++layerIdCounter;
-        layers[id] = { layer, name: file.name, color, visible: true, counts };
-
+        layers[id] = { layer, name: file.name, color, originalColor: color, chunks: kmlChunks, opacity: 1, visible: true, counts };
         if (targetLayerId === null) targetLayerId = id;
+
+        // Register features in the search index now that we have a layerId
+        newFeatureEntries.forEach(e => featureIndex.push({ ...e, layerId: id }));
 
         hideOverlay();
         showSidebar();
         updateNavCount();
         addLayerToUI(id, file.name, color);
 
+        // Smart default opacity: polygon/line layers → 60%, point-only → 100%
+        const hasPolygons = counts.Polygon > 0 || counts.LineString > 0;
+        if (hasPolygons) {
+            layers[id].opacity = 0.6;
+            applyLayerOpacity(id, 0.6);
+            const pipsEl = document.getElementById(`opacity-pips-${id}`);
+            if (pipsEl) {
+                pipsEl.querySelectorAll('.opacity-pip:not(.hide-pip)').forEach(b => {
+                    b.classList.toggle('active', b.dataset.v === '60');
+                });
+            }
+        }
+        // point-only layers: 100% pip already active by default in addLayerToUI
+
         // Hook for app-specific logic (Auditor needs explicit refresh)
         if (window.onKmzLoaded) window.onKmzLoaded();
+
+        // Reveal the minimap overview panel now that we have spatial data
+        showSharedMiniMap();
 
         window.JobTracker?.finish(jobId, [file]);
     } catch (e) {
         console.error(e);
         alert('Error reading file: ' + e.message);
         window.JobTracker?.fail(jobId, e.message);
+    } finally {
+        hideLoadingOverlay();
     }
 }
 
@@ -205,25 +351,46 @@ function addLayerToUI(id, name, color) {
     const item = document.createElement('div');
     item.id = `layer-item-${id}`;
     item.className = 'layer-item' + (isTarget ? ' is-target' : '');
+    item.draggable = true;
+    // Colour accent: left border in the layer's unique palette colour
+    item.style.borderLeft = `3px solid ${color}`;
     item.innerHTML = `
-        <span class="layer-swatch" style="background:${color};"></span>
-        <div style="flex:1; overflow:hidden;">
-            <div class="layer-name" id="layer-name-${id}" title="${name}">${name}</div>
-            <div class="layer-meta" style="font-size:10px; color:#999;">${countText}</div>
+        <div class="layer-main-row">
+            <span class="layer-drag-handle" title="Drag to reorder">
+                <i class="fa-solid fa-grip-vertical"></i>
+            </span>
+            <div class="layer-info">
+                <div class="layer-name" id="layer-name-${id}" title="${name}">${name}</div>
+                <div class="layer-meta">${countText}</div>
+            </div>
+            <button class="layer-btn btn-remove" onclick="removeLayer(${id})" title="Remove">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
-        <div class="layer-actions">
+        <div class="layer-controls-row">
             <button class="layer-btn btn-target ${isTarget ? 'active' : ''}"
                 id="btn-target-${id}" onclick="setTargetLayer(${id})"
                 title="${isTarget ? 'Current search target' : 'Set as search target'}">
                 <i class="fa-solid fa-crosshairs"></i>
             </button>
-            <button class="layer-btn btn-vis" id="btn-vis-${id}"
-                onclick="toggleLayer(${id})" title="Toggle visibility">
-                <i class="fa-solid fa-eye"></i>
-            </button>
-            <button class="layer-btn btn-remove" onclick="removeLayer(${id})" title="Remove">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
+            <div class="layer-ctrl-divider"></div>
+            <input type="color" class="layer-color-swatch" id="swatch-${id}"
+                value="${color}" title="Change colour"
+                onchange="changeLayerColor(${id}, this.value)">
+            <button class="btn-reset-color" onclick="resetLayerColor(${id})"
+                title="Revert to original colour"><i class="fa-solid fa-rotate-left"></i></button>
+            <div class="layer-ctrl-divider"></div>
+            <div class="opacity-pips" id="opacity-pips-${id}">
+                <button class="opacity-pip hide-pip" id="btn-vis-${id}"
+                    onclick="toggleLayer(${id})" title="Hide layer">
+                    <i class="fa-solid fa-eye-slash"></i>
+                </button>
+                <button class="opacity-pip" onclick="changeLayerOpacity(${id},20)" title="20%" data-v="20"></button>
+                <button class="opacity-pip" onclick="changeLayerOpacity(${id},40)" title="40%" data-v="40"></button>
+                <button class="opacity-pip" onclick="changeLayerOpacity(${id},60)" title="60%" data-v="60"></button>
+                <button class="opacity-pip" onclick="changeLayerOpacity(${id},80)" title="80%" data-v="80"></button>
+                <button class="opacity-pip active" onclick="changeLayerOpacity(${id},100)" title="100%" data-v="100"></button>
+            </div>
         </div>
     `;
     layerList.appendChild(item);
@@ -248,6 +415,190 @@ function refreshTargetLayerDropdown() {
         targetLayerId = parseInt(onlyId);
     }
 }
+
+// ─── Layer Drag-and-Drop Reordering ───────────────────────────────
+let _dragSrcId = null;
+
+layerList.addEventListener('dragstart', e => {
+    const item = e.target.closest('.layer-item');
+    if (!item) return;
+    _dragSrcId = parseInt(item.id.replace('layer-item-', ''));
+    item.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(_dragSrcId));
+});
+
+layerList.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const item = e.target.closest('.layer-item');
+    layerList.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    if (item && parseInt(item.id.replace('layer-item-', '')) !== _dragSrcId) {
+        item.classList.add('drop-target');
+    }
+});
+
+layerList.addEventListener('dragleave', e => {
+    if (!layerList.contains(e.relatedTarget)) {
+        layerList.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    }
+});
+
+layerList.addEventListener('drop', e => {
+    e.preventDefault();
+    const targetItem = e.target.closest('.layer-item');
+    if (!targetItem || _dragSrcId == null) return;
+    const targetId = parseInt(targetItem.id.replace('layer-item-', ''));
+    if (targetId === _dragSrcId) return;
+
+    const srcItem = document.getElementById(`layer-item-${_dragSrcId}`);
+    if (!srcItem) return;
+
+    // Determine drop position: insert before or after based on pointer Y
+    const rect = targetItem.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    if (after) targetItem.insertAdjacentElement('afterend', srcItem);
+    else targetItem.insertAdjacentElement('beforebegin', srcItem);
+
+    syncLayerOrder(); // Sync map canvas draw order to match sidebar order
+});
+
+layerList.addEventListener('dragend', () => {
+    layerList.querySelectorAll('.dragging, .drop-target')
+        .forEach(el => el.classList.remove('dragging', 'drop-target'));
+    _dragSrcId = null;
+});
+
+// Re-add all visible layers to the map in sidebar DOM order so the canvas
+// draws them in the correct stack (top of sidebar = drawn last = on top).
+function syncLayerOrder() {
+    const orderedIds = [...layerList.querySelectorAll('.layer-item')]
+        .map(el => parseInt(el.id.replace('layer-item-', '')))
+        .filter(id => !isNaN(id) && layers[id]);
+
+    // Remove all layers silently
+    orderedIds.forEach(id => {
+        if (layers[id].visible) map.removeLayer(layers[id].layer);
+    });
+    // Re-add in DOM order — first item draws at the bottom, last item on top
+    orderedIds.forEach(id => {
+        if (layers[id].visible) layers[id].layer.addTo(map);
+    });
+    // Restore styles without overwriting KML per-feature colours:
+    // only apply the flat override when the user has explicitly changed the colour.
+    orderedIds.forEach(id => {
+        const entry = layers[id];
+        if (entry.colorOverridden) {
+            applyLayerColor(id, entry.color);
+        } else {
+            (entry.chunks || []).forEach(chunkLayer => {
+                chunkLayer.eachLayer(feat => { try { chunkLayer.resetStyle(feat); } catch (_) { } });
+            });
+        }
+        // Re-apply opacity after reorder so the slider value is preserved
+        if (entry.opacity !== undefined && entry.opacity < 1) {
+            applyLayerOpacity(id, entry.opacity);
+        }
+    });
+}
+
+// ─── User-editable layer color ────────────────────────────────────
+// Called by the color swatch <input type="color"> onchange.
+window.changeLayerColor = function (id, newColor) {
+    if (!layers[id]) return;
+    layers[id].color = newColor;
+    layers[id].colorOverridden = true;
+    applyLayerColor(id, newColor);
+    const swatch = document.getElementById(`swatch-${id}`);
+    if (swatch) swatch.value = newColor;
+    // Re-apply opacity after color change (setStyle resets opacity to defaults)
+    if (layers[id].opacity !== undefined && layers[id].opacity < 1) {
+        applyLayerOpacity(id, layers[id].opacity);
+    }
+};
+
+// ─── User-editable layer opacity ───────────────────────────────────
+// Called by each opacity pip button.
+window.changeLayerOpacity = function (id, value) {
+    const opacity = parseInt(value, 10) / 100;
+    if (!layers[id]) return;
+
+    // If the layer is hidden, show it and deselect the hide pip first
+    if (!layers[id].visible) {
+        layers[id].layer.addTo(map);
+        layers[id].visible = true;
+        const nameEl = document.getElementById(`layer-name-${id}`);
+        if (nameEl) nameEl.classList.remove('muted');
+        const hideBtn = document.getElementById(`btn-vis-${id}`);
+        if (hideBtn) hideBtn.classList.remove('active');
+    }
+
+    layers[id].opacity = opacity;
+    applyLayerOpacity(id, opacity);
+    // Highlight the selected pip (skip hide-pip)
+    const pips = document.getElementById(`opacity-pips-${id}`);
+    if (pips) {
+        pips.querySelectorAll('.opacity-pip:not(.hide-pip)').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.v === String(value));
+        });
+    }
+};
+
+// Scale stroke and fill opacity of every feature in the layer by the given
+// multiplier (0–1). Fill is scaled relative to its natural 0.4 base.
+function applyLayerOpacity(id, opacity) {
+    const entry = layers[id];
+    if (!entry) return;
+    (entry.chunks || []).forEach(chunk => {
+        chunk.eachLayer(feat => {
+            try {
+                feat.setStyle({ opacity, fillOpacity: opacity });
+            } catch (_) { }
+        });
+    });
+}
+
+// Walk the featureGroup → geoJSON sublayers → individual features
+// and setStyle with the new color so the canvas redraws them immediately.
+function applyLayerColor(id, color) {
+    const entry = layers[id];
+    if (!entry) return;
+    entry.layer.eachLayer(chunk => {          // L.geoJSON chunks inside featureGroup
+        if (!chunk.eachLayer) return;
+        chunk.eachLayer(feat => {             // individual feature layers
+            try {
+                if (feat.getLatLng) {
+                    // Point / PinMarker — only fill colour changes
+                    feat.setStyle({ fillColor: color });
+                } else {
+                    // Polygon / Line — stroke + fill
+                    feat.setStyle({ color, fillColor: color });
+                }
+            } catch (_) { }
+        });
+    });
+}
+
+// Revert a layer to the colours embedded in the original KMZ/KML file.
+// L.geoJSON.resetStyle(feat) re-runs the style function which reads
+// p.stroke / p.fill from the feature's own KML properties.
+window.resetLayerColor = function (id) {
+    const entry = layers[id];
+    if (!entry) return;
+
+    // Re-apply KML-original per-feature styles via Leaflet's resetStyle
+    (entry.chunks || []).forEach(chunkLayer => {
+        chunkLayer.eachLayer(feat => {
+            try { chunkLayer.resetStyle(feat); } catch (_) { }
+        });
+    });
+
+    // Clear the override flag and revert swatch to palette original
+    entry.color = entry.originalColor;
+    entry.colorOverridden = false;
+    const swatch = document.getElementById(`swatch-${id}`);
+    if (swatch) swatch.value = entry.originalColor;
+};
 
 // ─── Layer Actions ────────────────────────────────────────────────
 window.setTargetLayer = function (id) {
@@ -279,18 +630,36 @@ window.setTargetLayer = function (id) {
 window.toggleLayer = function (id) {
     const entry = layers[id];
     if (!entry) return;
-    const btn = document.getElementById(`btn-vis-${id}`);
-    const name = document.getElementById(`layer-name-${id}`);
+    const hideBtn = document.getElementById(`btn-vis-${id}`);
+    const nameEl = document.getElementById(`layer-name-${id}`);
     if (entry.visible) {
         map.removeLayer(entry.layer);
         entry.visible = false;
-        if (btn) { btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i>'; btn.classList.add('hidden-layer'); }
-        if (name) name.classList.add('muted');
+        if (hideBtn) hideBtn.classList.add('active');
+        if (nameEl) nameEl.classList.add('muted');
+        // Deselect all opacity pips while hidden
+        const pipsContainer = document.getElementById(`opacity-pips-${id}`);
+        if (pipsContainer) {
+            pipsContainer.querySelectorAll('.opacity-pip:not(.hide-pip)')
+                .forEach(b => b.classList.remove('active'));
+        }
     } else {
         entry.layer.addTo(map);
         entry.visible = true;
-        if (btn) { btn.innerHTML = '<i class="fa-solid fa-eye"></i>'; btn.classList.remove('hidden-layer'); }
-        if (name) name.classList.remove('muted');
+        if (hideBtn) hideBtn.classList.remove('active');
+        if (nameEl) nameEl.classList.remove('muted');
+        // Restore the correct opacity pip
+        const opacityPct = String(Math.round((entry.opacity ?? 1) * 100));
+        const pipsContainer = document.getElementById(`opacity-pips-${id}`);
+        if (pipsContainer) {
+            pipsContainer.querySelectorAll('.opacity-pip:not(.hide-pip)').forEach(b => {
+                b.classList.toggle('active', b.dataset.v === opacityPct);
+            });
+        }
+        // Re-apply opacity so features aren't reset to full after unhide
+        if (entry.opacity !== undefined && entry.opacity < 1) {
+            applyLayerOpacity(id, entry.opacity);
+        }
     }
 };
 
@@ -309,6 +678,7 @@ window.removeLayer = function (id) {
     map.removeLayer(entry.layer);
     delete layers[id];
     document.getElementById(`layer-item-${id}`)?.remove();
+    featureIndex = featureIndex.filter(e => e.layerId !== id); // purge from search index
 
     if (targetLayerId === id) {
         targetLayerId = Object.keys(layers)[0] ? parseInt(Object.keys(layers)[0]) : null;
@@ -325,9 +695,126 @@ window.removeLayer = function (id) {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
-function showSidebar() { sidebar.classList.remove('sidebar-hidden'); setTimeout(() => map.invalidateSize(), 280); }
+function showSidebar() {
+    sidebar.classList.remove('sidebar-hidden');
+    setTimeout(() => map.invalidateSize(), 280);
+    injectSearchUI(); // idempotent — only builds DOM once
+}
 function hideOverlay() { uploadOverlay.classList.add('hidden'); }
 function showOverlay() { uploadOverlay.classList.remove('hidden'); }
+
+// ─── Feature Search ───────────────────────────────────────────────
+let _searchInjected = false;
+function injectSearchUI() {
+    if (_searchInjected || !sidebar) return;
+    _searchInjected = true;
+
+    const header = sidebar.querySelector('.sidebar-header');
+    if (!header) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = '_search-wrap';
+    wrap.className = 'search-wrap';
+    wrap.innerHTML = `
+        <div class="search-input-wrap">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="_search-box" class="search-input"
+                placeholder="Search features…" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="_search-results" class="search-results hidden"></div>`;
+    header.insertAdjacentElement('afterend', wrap);
+
+    const input = wrap.querySelector('#_search-box');
+    const results = wrap.querySelector('#_search-results');
+
+    function closeResults() { results.classList.add('hidden'); }
+
+    function renderResults(q, exact) {
+        if (!q) { closeResults(); return; }
+        const matches = featureIndex
+            .filter(e => exact
+                ? e.name.toLowerCase() === q          // trailing space → exact match
+                : e.name.toLowerCase().includes(q))   // no space → substring match
+            .slice(0, 12);
+
+        if (!matches.length) {
+            results.innerHTML = `<div class="search-no-result">${exact ? 'No exact match' : 'No matches found'}</div>`;
+        } else {
+            results.innerHTML = matches.map((e, i) => `
+                <div class="search-result-item" data-i="${i}">
+                    <span class="search-result-name">${hlMatch(e.name, q)}</span>
+                    <span class="search-result-layer">${layers[e.layerId]?.name ?? ''}</span>
+                </div>`).join('');
+            results.querySelectorAll('.search-result-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    flyToFeature(matches[+el.dataset.i]);
+                    input.value = matches[+el.dataset.i].name;
+                    closeResults();
+                });
+            });
+        }
+        results.classList.remove('hidden');
+    }
+
+    input.addEventListener('input', () => {
+        const raw = input.value;
+        const endsWithSpace = raw.endsWith(' '); // trailing space = exact mode
+        const q = raw.trim().toLowerCase();
+        renderResults(q, endsWithSpace);
+    });
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { closeResults(); input.blur(); }
+    });
+    // Close when clicking outside
+    document.addEventListener('click', e => {
+        if (!wrap.contains(e.target)) closeResults();
+    }, true);
+}
+
+// Highlight matched substring inside a feature name
+function hlMatch(text, q) {
+    const i = text.toLowerCase().indexOf(q);
+    if (i < 0) return _esc(text);
+    return _esc(text.slice(0, i))
+        + `<mark>${_esc(text.slice(i, i + q.length))}</mark>`
+        + _esc(text.slice(i + q.length));
+}
+function _esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Fly map to a feature: fitBounds for polygons/lines, flyTo for points
+function flyToFeature(entry) {
+    try {
+        let usedBounds = false;
+        // Polygons and lines have getBounds — fit the whole shape on screen
+        if (entry.lyr.getBounds) {
+            try {
+                const b = entry.lyr.getBounds();
+                if (b.isValid()) {
+                    map.flyToBounds(b, { padding: [60, 60], maxZoom: 17, duration: 0.7 });
+                    usedBounds = true;
+                }
+            } catch (_) { }
+        }
+        // Points (no getBounds) — just centre on the pin
+        if (!usedBounds) {
+            map.flyTo(entry.center, Math.max(map.getZoom(), 15), { duration: 0.7 });
+        }
+        // Open popup after the animation settles
+        setTimeout(() => { try { entry.lyr.openPopup(); } catch (_) { } }, 800);
+    } catch (_) { }
+}
+
+// ─── Keyboard shortcut: Ctrl+F or '/' focuses search ─────────────
+document.addEventListener('keydown', e => {
+    const tag = document.activeElement?.tagName;
+    const isTyping = tag === 'INPUT' || tag === 'TEXTAREA';
+    if ((e.ctrlKey && e.key === 'f') || (!isTyping && e.key === '/')) {
+        const box = document.getElementById('_search-box');
+        if (box) { e.preventDefault(); box.focus(); box.select(); }
+    }
+});
 
 function updateNavCount() {
     const count = Object.keys(layers).length;
@@ -369,12 +856,21 @@ imageryDateDisplay.style.display = 'none'; // Hidden by default
 if (mapWrap) mapWrap.appendChild(imageryDateDisplay);
 
 let lastImageryFetch = 0;
-const FETCH_THROTTLE_MS = 1000; // Throttle slightly for smoothness
+const FETCH_THROTTLE_MS = 1500; // Min ms between imagery API calls
 
+// Track mouse position for the I-key imagery shortcut
+map.on('mousemove', e => { lastMouseLatLng = e.latlng; });
 
-// Update on map move/zoom end
-map.on('moveend', updateImageryDate);
-map.on('zoomend', updateImageryDate);
+// Debounce helper — coalesces rapid moveend/zoomend into a single call
+function debounce(fn, ms) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
+// Update on map move/zoom end — debounced so rapid panning fires only once
+const debouncedUpdateImageryDate = debounce(updateImageryDate, 300);
+map.on('moveend', debouncedUpdateImageryDate);
+map.on('zoomend', debouncedUpdateImageryDate);
 
 // Toggle based on active base layer
 map.on('baselayerchange', e => {
@@ -392,6 +888,10 @@ async function updateImageryDate() {
         return;
     }
 
+    // Enforce throttle — skip if called too soon after the last successful fetch
+    const now = Date.now();
+    if (now - lastImageryFetch < FETCH_THROTTLE_MS) return;
+
     const center = map.getCenter();
 
     // Show loading state
@@ -400,6 +900,7 @@ async function updateImageryDate() {
 
     try {
         const date = await fetchImageryDate(center);
+        lastImageryFetch = Date.now(); // Record time of successful fetch
         // Double check layer is still active after await
         if (date && map.hasLayer(satelliteLayer)) {
             const age = getImageryAge(date);
@@ -489,3 +990,94 @@ async function fetchImageryDate(latlng) {
     }
     return null;
 }
+
+// ─── Shared Mini-Map Overview ──────────────────────────────────────────────
+let miniMapLeaflet = null;
+let miniViewportRect = null;
+let miniPanel = null;
+
+function initSharedMiniMap() {
+    if (miniMapLeaflet) return;
+
+    // 1. Build DOM structure dynamically
+    miniPanel = document.createElement('div');
+    miniPanel.id = 'mini-map-panel';
+    // Hide initially until a layer is actually loaded to keep the map clean
+    miniPanel.style.display = 'none';
+
+    miniPanel.innerHTML = `
+        <div id="mini-map-container"></div>
+        <div id="mini-map-blocker"></div>
+        <button id="mini-map-toggle-btn" title="Toggle overview">
+            <i class="fa-solid fa-compress"></i>
+        </button>
+    `;
+
+    // Inject into the map wrapper so it overlays nicely over the primary map
+    const wrapper = document.getElementById('map-wrap') || document.body;
+    wrapper.appendChild(miniPanel);
+
+    // Bind window toggle function
+    document.getElementById('mini-map-toggle-btn').addEventListener('click', () => {
+        if (!miniPanel) return;
+        const isCollapsed = miniPanel.classList.toggle('collapsed');
+        const icon = miniPanel.querySelector('#mini-map-toggle-btn i');
+        if (icon) icon.className = isCollapsed ? 'fa-solid fa-expand' : 'fa-solid fa-compress';
+
+        // Refresh Leaflet size after expand finishes (wait for CSS transition)
+        if (!isCollapsed && miniMapLeaflet) {
+            setTimeout(() => miniMapLeaflet.invalidateSize(), 520);
+            syncMiniMapView();
+        }
+    });
+
+    // 2. Initialize second static Leaflet map — completely read-only
+    miniMapLeaflet = L.map('mini-map-container', {
+        dragging: false,
+        touchZoom: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        zoomControl: false,
+        attributionControl: false
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMapLeaflet);
+
+    // 3. Bind to the primary map's movement
+    syncMiniMapView();
+    map.on('moveend zoomend', syncMiniMapView);
+}
+
+function syncMiniMapView() {
+    if (!miniMapLeaflet) return;
+
+    // Keep the minimap much more zoomed out than the primary map (contextual overview)
+    const zoom = Math.max(0, map.getZoom() - 8);
+    miniMapLeaflet.setView(map.getCenter(), zoom, { animate: false });
+
+    // Draw / update the viewport rectangle representing the main map's bounds
+    const bounds = map.getBounds();
+    if (!miniViewportRect) {
+        miniViewportRect = L.rectangle(bounds, {
+            color: '#e5322d', weight: 2,
+            fill: true, fillColor: '#e5322d', fillOpacity: 0.12,
+            interactive: false
+        }).addTo(miniMapLeaflet);
+    } else {
+        miniViewportRect.setBounds(bounds);
+    }
+}
+
+// Function exposed to reveal the minimap when appropriate (e.g. after KMZ load)
+function showSharedMiniMap() {
+    if (miniPanel && (miniPanel.style.display === 'none' || !miniPanel.style.display)) {
+        miniPanel.style.display = 'block';
+        // Wait for it to become visible before recalculating canvas size
+        setTimeout(() => { if (miniMapLeaflet) miniMapLeaflet.invalidateSize(); }, 100);
+    }
+}
+
+// Initialize the structure once the DOM is ready
+document.addEventListener('DOMContentLoaded', initSharedMiniMap);

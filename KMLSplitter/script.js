@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRestart = document.getElementById('btn-restart');
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
+    const progressDetails = document.getElementById('progress-details');
+    const resultSummary = document.getElementById('result-summary');
 
     let currentFile = null;
     let generatedBlob = null;
@@ -53,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Simulate logic
         setTimeout(() => {
             try {
-                updateProgress(50, 'Processing data...');
+                updateProgress(50, 'Processing data...', `Splitting features... (${1} item(s))`);
 
                 // --- Business Logic Goes Here ---
 
@@ -66,6 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 JobTracker.finish(jobId, [new File([generatedBlob], generatedName)]);
 
                 updateProgress(100, 'Done!');
+                if (resultSummary) {
+                    resultSummary.innerHTML = `
+                        <div class="stat-box success">
+                            <span class="stat-value">1</span>
+                            <span class="stat-label">File Split</span>
+                        </div>
+                    `;
+                }
                 showView(resultView);
 
                 // Auto Download
@@ -92,9 +102,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateProgress(percent, text) {
+    function updateProgress(percent, text, details) {
         if (progressBar) progressBar.style.width = `${percent}%`;
         if (progressText && text) progressText.innerText = text;
+        if (progressDetails) {
+            if (details) {
+                progressDetails.innerText = details;
+                progressDetails.style.display = 'block';
+            } else {
+                progressDetails.innerText = '';
+                progressDetails.style.display = 'none';
+            }
+        }
     }
 
     function resetApp() {
@@ -102,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedBlob = null;
         if (dropZoneController) dropZoneController.reset();
         updateProgress(0, "Reading files...");
+        if (resultSummary) resultSummary.innerHTML = '';
         showView(uploadView);
     }
 });

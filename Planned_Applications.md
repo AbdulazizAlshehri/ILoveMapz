@@ -11,7 +11,7 @@ This document outlines the prioritized suite of applications for the "NQoS Toolb
 | :--- | :--- | :--- | :--- |
 | 🔄 **Conversion** | Orange | Excel to KMZ Converter, KMZ to Excel Converter | ✅ Live |
 | 🗺️ **Visualization** | Green | KMZ Preview App, KMZ Field Auditor | ✅ Live |
-| 📊 **Analysis** | Blue | Calculate KMZ Overlap, Site Radius Generator | ✅ Live |
+| 📊 **Analysis** | Blue | Calculate KMZ Overlap, Site Radius Generator, Color Code Polygons | ✅ Live / 🚧 Planned |
 
 ---
 
@@ -27,6 +27,21 @@ These are the active core applications currently available in the NQoS Toolbox.
 | **4. Site Radius Generator** | **Analyze** | Draw coverage circles (donuts) around sites. | Excel/CSV (Lat/Long) | KMZ (Circles) |
 | **5. KMZ Preview App** | **View** | Lightweight, offline KMZ viewer. Shared core with Auditor. | .kmz / .kml | Map Visualization |
 | **6. KMZ Field Auditor** | **View / Annotate** | Map-based field review driven by Excel. Zoom, verify, annotate. | Excel + Multiple KMZ | Annotated Excel |
+
+---
+
+## Planned Applications (Low Priority)
+Applications that are spec'd and queued for future implementation, but are not yet built.
+
+| App Name | Category | Use Case | Input | Output |
+| :--- | :--- | :--- | :--- | :--- |
+| **7. Color Code Polygons** | **Analyze** | Color-code map polygons based on an Excel value column. | KMZ (Polygons) + Excel | KMZ (Colored) |
+| **8. Driving Distance Calculator** | **Analyze** | Calculate routing distances between an origin and destinations. | Lat/Long | Routing Data |
+| **9. KML Splitter** | **Utilities** | Split large KML/KMZ files into smaller chunks. | KMZ/KML | Zip (KMZs) |
+| **10. KMZ Merger** | **Utilities** | Combine multiple KMZ/KML files into one. | Multiple KMZ/KML | KMZ |
+| **11. Neighbor Auditor** | **Analyze** | Identify neighboring sites based on distance parameters. | Excel (Sites) | Excel (Neighbors) |
+| **12. Point in Polygon** | **Analyze** | Map point coordinates to containing polygons. | KMZ (Polys) + Excel (Pts) | Excel (Mapped) |
+| **13. System Evaluation** | **Admin** | Central tracker for system health and processed jobs. | System Logs | Dashboard |
 
 ---
 
@@ -185,3 +200,5 @@ A specialized tool for verifying field data against map locations. It combines t
 - **Annotated Excel File**: The original file with an appended column containing your audit notes.
 
 
+### 7. Color Code Polygons
+> Develop a "Color Code Polygons" tool (Low Priority). **Workflow:** Standard 4-step SPA. **1. Upload:** Two files: A map file containing Polygon geometries (KMZ/KML) and a dataset file (Excel/CSV). **2. Config:** Select the matching key column in the Excel file, the target name in the KMZ file, and the Value column in the Excel file determining the color. Allow selection of a color gradient range. **3. Process:** Merges data locally, applying calculating gradient fills to matched polygons. **4. Result:** Auto-downloads a new `.kmz` file with styled colored polygons.

@@ -9,7 +9,7 @@ const day = String(now.getDate()).padStart(2, '0');
 const hours = String(now.getHours()).padStart(2, '0');
 const minutes = String(now.getMinutes()).padStart(2, '0');
 
-const versionString = `v${year}.${month}.${day}-${hours}${minutes}`;
+const versionString = `v${year}.${month}.${day}-${hours}${minutes}-dev`;
 console.log(`[NQoS-Tools] Stamping new version: ${versionString}`);
 
 // 2. Identify target files

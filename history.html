@@ -18,13 +18,6 @@
     <link rel="stylesheet" href="shared.css">
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <style>
-        /* Wide container for this page */
-        .wide-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 40px;
-        }
-
         /* Stats Grid - 4 columns */
         .stats-grid {
             display: grid;
@@ -201,10 +194,6 @@
         }
 
         @media (max-width: 768px) {
-            .wide-container {
-                padding: 0 16px;
-            }
-
             .stats-grid {
                 grid-template-columns: 1fr;
             }
@@ -238,22 +227,21 @@
     <!-- NAVBAR -->
     <nav class="navbar">
         <a href="index.html" class="brand">
-            <img src="assets/logo.png" alt="NQoS Tools" class="brand-logo">
+            <i class="fa-solid fa-earth-americas" style="color: var(--color-primary); font-size: 24px;"></i> <span
+                style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 20px; color: var(--color-text); margin-left:8px; letter-spacing: -0.5px;">NQoS
+                Tools</span>
         </a>
         <div class="nav-menu">
             <a href="index.html" class="nav-item">ALL TOOLS</a>
         </div>
     </nav>
 
-    <!-- HEADER -->
-    <header class="hero-landing">
-        <h1 class="hero-title">System Evaluation Dashboard</h1>
-        <p class="hero-subtitle">Comprehensive monitoring of job processing, performance metrics, and system activity.
-        </p>
-    </header>
-
-    <!-- MAIN CONTENT -->
-    <main class="wide-container" style="padding-bottom:80px;">
+    <!-- TOOL STAGE -->
+    <div class="tool-stage" style="max-width: 1400px; padding: 20px; margin: 40px auto;">
+        <div class="tool-header">
+            <h1>System Evaluation Dashboard</h1>
+            <p>Comprehensive monitoring of job processing, performance metrics, and system activity.</p>
+        </div>
 
         <!-- STATS CARDS -->
         <div class="stats-grid">
@@ -365,7 +353,7 @@
             </div>
         </div>
 
-    </main>
+    </div>
 
     <!-- FOOTER -->
     <footer class="footer">
