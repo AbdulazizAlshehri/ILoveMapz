@@ -3,13 +3,13 @@ const path = require('path');
 
 // 1. Generate version string based on current date
 const now = new Date();
-const year = now.getFullYear();
-const month = String(now.getMonth() + 1).padStart(2, '0');
-const day = String(now.getDate()).padStart(2, '0');
-const hours = String(now.getHours()).padStart(2, '0');
-const minutes = String(now.getMinutes()).padStart(2, '0');
+const vMajor = String(now.getFullYear()).charAt(0); // 2
+const vMinor = String(now.getFullYear()).slice(-1); // 6
+const vPatch = `${now.getMonth() + 1}${String(now.getDate()).padStart(2, '0')}`;
+const bHours = String(now.getHours()).padStart(2, '0');
+const bMins = String(now.getMinutes()).padStart(2, '0');
 
-const versionString = `v${year}.${month}.${day}-${hours}${minutes}-dev`;
+const versionString = `v${vMajor}.${vMinor}.${vPatch}-b${bHours}${bMins}`;
 console.log(`[NQoS-Tools] Stamping new version: ${versionString}`);
 
 // 2. Identify target files
