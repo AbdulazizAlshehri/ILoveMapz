@@ -1,7 +1,7 @@
 // logTracker.js — Renders real activity log with Filter, Export, and Clear History
 
 (function () {
-    const LOG_KEY = 'nqos_activity_master_log';
+    const LOG_KEY = window.KEYS?.LOG || 'ilovemapz_activity_master_log';
     const PAGE_SIZE = 25;
     let currentPage = 1;
     let allJobs = [];       // all JOB entries from localStorage
@@ -17,9 +17,25 @@
     }
 
     function formatDuration(ms) {
-        if (!ms || ms <= 0) return '—';
-        if (ms < 1000) return ms + 'ms';
-        return (ms / 1000).toFixed(1) + 's';
+        if (ms == null || ms < 0) return '—';
+        if (ms === 0) return '0ms';
+        if (ms < 1000) return Math.round(ms) + 'ms';
+
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours === 0 && minutes === 0) {
+            return (ms / 1000).toFixed(1) + 's';
+        }
+
+        let parts = [];
+        if (hours > 0) parts.push(hours + 'h');
+        if (minutes > 0) parts.push(minutes + 'm');
+        if (seconds > 0 || (hours === 0 && minutes === 0)) parts.push(seconds + 's');
+
+        return parts.join(' ');
     }
 
     function formatTimestamp(iso) {
@@ -45,9 +61,13 @@
         const outputFiles = files.filter(f => f.type === 'out');
 
         const status = d.status || '—';
-        const statusClass = status === 'Success' ? 'status-success'
-            : status === 'Error' ? 'status-error'
-                : 'status-info';
+        let statusClass = 'status-info';
+        if (status === 'Success') statusClass = 'status-success';
+        else if (status.includes('Error')) statusClass = 'status-error';
+        else if (status.includes('Cancel')) statusClass = 'status-warning';
+        else if (status === 'User Action') statusClass = 'status-action';
+
+        const messageHtml = d.message ? `<div style="font-size:11px; color:#7f8c8d; margin-top:6px; max-width:200px; line-height:1.3;">${d.message}</div>` : '';
 
         const device = entry.device || {};
         const os = device.os || 'Unknown';
@@ -60,7 +80,7 @@
             <td><span class="job-type">${entry.action || '—'}</span></td>
             <td>${renderFileCell(inputFiles)}</td>
             <td>${renderFileCell(outputFiles)}</td>
-            <td><span class="status-badge ${statusClass}">${status}</span></td>
+            <td><span class="status-badge ${statusClass}">${status}</span>${messageHtml}</td>
             <td><span class="duration">${formatDuration(d.duration)}</span></td>
             <td>
                 <div style="font-weight:500;">${deviceLabel}</div>
@@ -92,7 +112,7 @@
         } else {
             set('stat-data-processed', `${(s.totalBytes / 1024).toFixed(0)}<span style="font-size:16px;font-weight:500;margin-left:2px;">KB</span>`);
         }
-        set('stat-avg-duration', `${(s.avgMs / 1000).toFixed(1)}<span style="font-size:16px;font-weight:500;margin-left:2px;">s</span>`);
+        set('stat-avg-duration', `${formatDuration(s.avgMs)}`);
     }
 
     // ─── Pagination ────────────────────────────────────────────────────────────
@@ -284,7 +304,8 @@
         const raw = localStorage.getItem(LOG_KEY);
         const log = raw ? JSON.parse(raw) : [];
 
-        allJobs = log.filter(e => e.type === 'JOB');
+        // Include both JOB outcomes and granular INTERACTION events
+        allJobs = log.filter(e => e.type === 'JOB' || e.type === 'INTERACTION');
         filteredJobs = [...allJobs];
 
         if (allJobs.length === 0) {

@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showView(processingView);
         updateProgress(0, "Starting...", "Initializing processors");
 
-        const jobId = JobTracker.start('KMZOverlap', [fileA, fileB]);
+        const jobId = JobTracker.start('PolygonsOverlap', [fileA, fileB]);
         try {
             // 1. Parse File A (Coverage Source)
             updateProgress(10, "Processing File A (Source)...", "Extracting KML/KMZ");
@@ -231,6 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (polygonsA.length === 0) throw new Error("File A (Source) contains no valid polygons.");
 
+            let totalAreaA = 0;
+            polygonsA.forEach(p => { totalAreaA += turf.area(p); });
+            totalAreaA = totalAreaA / 1_000_000;
+
             // 2. Parse File B (Target Reference)
             updateProgress(30, "Processing File B (Target)...", "Extracting KML/KMZ");
             const geoJsonB = await parseFileToGeoJSON(fileB);
@@ -238,12 +242,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (polygonsB.length === 0) throw new Error("File B (Target) contains no valid polygons.");
 
-            const totalTargetLoaded = polygonsB.length; // save before filter
+            const totalDataLoaded = polygonsB.length; // save before filter
+
+            let totalAreaB = 0;
+            polygonsB.forEach(p => { totalAreaB += turf.area(p); });
+            totalAreaB = totalAreaB / 1_000_000;
 
             // 2.1 Apply Filter if present
             const filterText = targetFilterInput ? targetFilterInput.value.toLowerCase().trim() : "";
             const filterCol = filterColSelect ? filterColSelect.value : "name";
             const overlapCol = overlapColSelect ? overlapColSelect.value : "";
+
+            let filteredAreaB = 0;
+
             if (filterText) {
                 const initialCount = polygonsB.length;
                 polygonsB = polygonsB.filter(p => {
@@ -255,6 +266,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(`No Target polygons found matching filter "${filterText}". (Total in file: ${initialCount})`);
                 }
                 updateProgress(35, "Filtering...", `Filtered targets from ${initialCount} down to ${polygonsB.length}`);
+
+                polygonsB.forEach(p => { filteredAreaB += turf.area(p); });
+                filteredAreaB = filteredAreaB / 1_000_000;
             }
 
             // 3. Analysis Loop: Iterate Target (B) and check overlap with Source (A)
@@ -281,8 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const percent = 40 + Math.floor((i / total) * 50); // 40% to 90%
                 updateProgress(percent, "Calculating Overlap...", `Processed ${Math.min(i + chunkSize, total)} / ${total} zones`);
 
-                // Yield to main thread
-                await new Promise(r => setTimeout(r, 0));
+                // Yield to main thread without background throttling
+                await yieldToMain();
             }
 
             // 5. Generate Excel
@@ -295,8 +309,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateProgress(100, "Done!", "");
             showStats(results, polygonsA.length, overlapCol, {
-                totalTargetLoaded: totalTargetLoaded,
-                filteredCount: filterText ? polygonsB.length : null
+                totalDataLoaded: totalDataLoaded,
+                filteredCount: filterText ? polygonsB.length : null,
+                totalAreaA: totalAreaA,
+                totalAreaB: totalAreaB,
+                filteredAreaB: filteredAreaB
             });
             showView(resultView);
 
@@ -485,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (overlapCol && props[overlapCol]) {
                 const rawVal = parseFloat(props[overlapCol].replace(/[^\d.-]/g, '')) || 0;
-                finalRow[`Target_${overlapCol}`] = rawVal;
+                finalRow[`CoveredData_${overlapCol}`] = rawVal;
                 finalRow[`Overlapping_${overlapCol}`] = parseFloat((rawVal * pct).toFixed(4));
             }
 
@@ -504,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateExcel(results) {
         const worksheet = XLSX.utils.json_to_sheet(results);
         resultWorkbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(resultWorkbook, worksheet, "Overlap Analysis");
+        XLSX.utils.book_append_sheet(resultWorkbook, worksheet, "Polygons Overlap");
 
         const excelBuffer = XLSX.write(resultWorkbook, { bookType: 'xlsx', type: 'array' });
         return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -550,103 +567,129 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showStats(results, sourceCount, overlapCol, ctx) {
         ctx = ctx || {};
-        const fmt = function (n) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
-        const totalTargetLoaded = ctx.totalTargetLoaded != null ? ctx.totalTargetLoaded : results.length;
+        const fmt = formatNumber;
+        const totalDataLoaded = ctx.totalDataLoaded != null ? ctx.totalDataLoaded : results.length;
         const filteredCount = ctx.filteredCount != null ? ctx.filteredCount : null;
-        const avg = results.reduce(function (acc, r) { return acc + (r.Coverage_Percent || 0); }, 0) / (results.length || 1);
+        const totalAreaA = ctx.totalAreaA || 0;
+        const totalAreaB = ctx.totalAreaB || 0;
+        const filteredAreaB = ctx.filteredAreaB || 0;
+
+        // Overlap (Covered Space)
         const totalCovered = results.reduce(function (acc, r) { return acc + (r.Covered_Area_km2 || 0); }, 0);
 
         // Make the view wide enough to comfortably fit the pipeline
-        resultView.style.maxWidth = '100%';
+        resultView.style.maxWidth = '1200px';
+        resultView.style.width = '100%';
         resultSummary.style.maxWidth = '100%'; // Override shared.css 600px restriction
         resultSummary.style.display = 'block'; // Override shared.css flex
 
-        // Helper for floating arrows between grid columns
-        const arrowHtml = (color) => `<div style="position:absolute; right:-30px; top:50%; transform:translateY(-50%); font-size:20px; color:${color};"><i class="fa-solid fa-arrow-right-long"></i></div>`;
+        const showProcessed = filteredCount !== null;
+        let gridCols = "auto 1fr";
+        if (showProcessed) gridCols += " 30px 1fr";
+        if (overlapCol) gridCols += " 30px 1fr";
 
-        var html = '<div style="display:grid; grid-template-rows: 1fr 1fr; grid-auto-columns: minmax(240px, 1fr); gap: 20px 40px; width:100%; overflow-x:auto; padding: 10px 30px 20px 10px;">';
+        let html = `<div style="display:grid; grid-template-columns: ${gridCols}; grid-template-rows: auto 1fr 1fr; gap: 15px; width:100%; align-items: stretch; margin-top:20px;">`;
 
-        let col = 1;
+        const solidArrow = `<div style="display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:18px;"><i class="fa-solid fa-chevron-right"></i></div>`;
+        const faintArrow = `<div style="display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-size:18px; opacity:0.3;"><i class="fa-solid fa-chevron-right"></i></div>`;
 
-        // ==========================================
-        // STAGE 1: Upload (Col 1)
-        // ==========================================
-        // 1. Base Layer Status (Row 1)
-        html += `<div class="flow-stage" style="grid-row: 1; grid-column: ${col}; margin:0; border-left:4px solid var(--color-primary); background:#fff; position:relative;">`;
-        html += '<div class="flow-stage-icon"><i class="fa-solid fa-map" style="color: var(--color-primary);"></i></div>';
-        html += '<div class="flow-stage-items" style="flex:1;">';
-        html += '<div class="flow-stage-label" style="border:none; margin:0;" title="The polygon geometry that serves as the boundary bounds.">Base Layer (Source)</div>';
-        html += '<div class="flow-item"><span class="flow-item-value" style="color:var(--color-primary);">' + fmt(sourceCount) + '</span><span class="flow-item-sub">Polygons</span></div>';
-        html += '</div>';
-        html += arrowHtml('var(--color-primary)'); // Arrow to Col 2
-        html += '</div>';
-
-        // 2. Target Layer Status (Row 2)
-        html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #333; background:#fff; position:relative;">`;
-        html += '<div class="flow-stage-icon"><i class="fa-solid fa-map-location-dot" style="color: #333;"></i></div>';
-        html += '<div class="flow-stage-items" style="flex:1;">';
-        html += '<div class="flow-stage-label" style="border:none; margin:0;">Target Layer (Data)</div>';
-        html += '<div class="flow-item"><span class="flow-item-value" style="color:#333;">' + fmt(totalTargetLoaded) + '</span><span class="flow-item-sub">Analyzed</span></div>';
-        html += '</div>';
-        html += arrowHtml('#333'); // Arrow to Col 2
-        html += '</div>';
-
-        col++;
-
-        // ==========================================
-        // STAGE 2: Area / Filters (Col 2)
-        // ==========================================
-        // 1. Base Layer Outcome - Area Covered (Row 1)
-        html += `<div class="flow-stage" style="grid-row: 1; grid-column: ${col}; margin:0; border-left:4px solid #2ecc71; background:#fff; position:relative;">`;
-        html += '<div class="flow-stage-icon"><i class="fa-solid fa-draw-polygon" style="color: #2ecc71;"></i></div>';
-        html += '<div class="flow-stage-items" style="flex:1;">';
-        html += '<div class="flow-stage-label" style="border:none; margin:0;" title="The total physical area from the Base Layer that landed on valid Targets.">Union Area Covered</div>';
-        html += '<div class="flow-item"><span class="flow-item-value" style="color:#2c3e50;">' + fmt(totalCovered) + ' <span style="font-size:12px;">km²</span></span><span class="flow-item-sub">Total Spanned</span></div>';
-        html += '</div></div>';
-
-        // 2. Target Filter Result (Row 2)
-        if (filteredCount !== null) {
-            html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #f39c12; background:#fff; position:relative;">`;
-            html += '<div class="flow-stage-icon"><i class="fa-solid fa-filter" style="color: #f39c12;"></i></div>';
-            html += '<div class="flow-stage-items" style="flex:1;">';
-            html += '<div class="flow-stage-label" style="border:none; margin:0;">Filtered</div>';
-            html += '<div class="flow-item"><span class="flow-item-value" style="color:#f39c12;">' + fmt(filteredCount) + '</span><span class="flow-item-sub">Matches Surviving</span></div>';
-            html += '</div>';
-            html += arrowHtml('#333');
-            html += '</div>';
-            col++;
+        // --- ROW 0: Headers ---
+        html += `
+            <div></div> <!-- Empty top-left -->
+            <div style="text-align:center; font-weight:600; color:#7f8c8d; font-size:13px; text-transform:uppercase; letter-spacing:1px; padding-bottom:5px; border-bottom:2px solid #eee;">Input</div>
+        `;
+        if (showProcessed) {
+            html += `<div></div><div style="text-align:center; font-weight:600; color:#7f8c8d; font-size:13px; text-transform:uppercase; letter-spacing:1px; padding-bottom:5px; border-bottom:2px solid #eee;">Processed</div>`;
         }
-
-        // ==========================================
-        // STAGE 3: Overlap Coverage (Col 3)
-        // ==========================================
-        html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #27ae60; background:#fff; position:relative;">`;
-        html += '<div class="flow-stage-icon"><i class="fa-solid fa-percentage" style="color: #27ae60;"></i></div>';
-        html += '<div class="flow-stage-items" style="flex:1;">';
-        html += '<div class="flow-stage-label" style="border:none; margin:0;">Target Coverage</div>';
-        html += '<div class="flow-item"><span class="flow-item-value" style="color:#27ae60;">' + (avg * 100).toFixed(2) + '%</span><span class="flow-item-sub">Avg Hit Per Target</span></div>';
-        html += '</div>';
-        if (overlapCol) html += arrowHtml('#333');
-        html += '</div>';
-
-        // ==========================================
-        // STAGE 4: Math Extraction (Col 4)
-        // ==========================================
         if (overlapCol) {
-            col++;
-            var sumCol = results.reduce(function (acc, r) { return acc + (r['Target_' + overlapCol] || 0); }, 0);
-            var sumOverlapCol = results.reduce(function (acc, r) { return acc + (r['Overlapping_' + overlapCol] || 0); }, 0);
-            var colPct = sumCol > 0 ? (sumOverlapCol / sumCol * 100).toFixed(2) + '%' : '—';
-
-            html += `<div class="flow-stage" style="grid-row: 2; grid-column: ${col}; margin:0; border-left:4px solid #8e44ad; background:#fff; position:relative;">`;
-            html += '<div class="flow-stage-icon"><i class="fa-solid fa-calculator" style="color:#8e44ad;"></i></div>';
-            html += '<div class="flow-stage-items" style="flex:1;">';
-            html += '<div class="flow-stage-label" style="border:none; margin:0;" title="' + overlapCol + '">' + (overlapCol.length > 18 ? overlapCol.substring(0, 18) + '...' : overlapCol) + '</div>';
-            html += '<div class="flow-item"><span class="flow-item-value" style="color:#8e44ad;">' + fmt(sumOverlapCol) + '</span><span class="flow-item-sub">Values Captured (' + colPct + ')</span></div>';
-            html += '</div></div>';
+            html += `<div></div><div style="text-align:center; font-weight:600; color:#7f8c8d; font-size:13px; text-transform:uppercase; letter-spacing:1px; padding-bottom:5px; border-bottom:2px solid #eee;">Feature Match</div>`;
         }
 
-        html += '</div>'; // End Grid Wrapper
+        const cardStyle = "border:1px solid #e2e8f0; box-shadow:none; padding:15px; display:flex; flex-direction:column; justify-content:flex-start;";
+
+        // --- ROW 1: Source File ---
+        html += `
+            <div style="display:flex; flex-direction:column; justify-content:center; align-items:flex-end; text-align:right; border-right:3px solid var(--color-primary); padding-right:15px; min-width:140px;">
+                <span style="font-weight:700; color:var(--color-primary); font-size:15px;">Coverage Layer</span>
+                <span style="font-size:12px; color:#95a5a6;">(Upper Layer)</span>
+            </div>
+
+            <!-- Col 1: Input -->
+            <div class="stat-card" style="${cardStyle}">
+                <div class="stat-card-value" style="color:var(--color-primary); font-size:24px;">${fmt(sourceCount)}</div>
+                <div class="stat-card-label" style="font-size:12px;">Polygons Parsed</div>
+                <div style="margin-top:auto; padding-top:12px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="font-size:12px; color:#64748b;">Total Space: <strong>${fmt(totalAreaA)} km²</strong></div>
+                </div>
+            </div>
+        `;
+        if (showProcessed) {
+            html += faintArrow;
+            html += `<div class="stat-card" style="border:1px dashed #cbd5e1; background:transparent; box-shadow:none; opacity:0.3;"></div>`;
+        }
+        if (overlapCol) {
+            html += faintArrow;
+            html += `<div class="stat-card" style="border:1px dashed #cbd5e1; background:transparent; box-shadow:none; opacity:0.3;"></div>`;
+        }
+
+        // --- ROW 2: Target File ---
+        html += `
+            <div style="display:flex; flex-direction:column; justify-content:center; align-items:flex-end; text-align:right; border-right:3px solid #16a34a; padding-right:15px;">
+                <span style="font-weight:700; color:#2c3e50; font-size:15px;">Covered Layer</span>
+                <span style="font-size:12px; color:#95a5a6;">(Bottom Layer)</span>
+            </div>
+
+            <!-- Col 1: Input -->
+            <div class="stat-card" style="${cardStyle}">
+                <div class="stat-card-value" style="color:#2c3e50; font-size:24px;">${fmt(totalDataLoaded)}</div>
+                <div class="stat-card-label" style="font-size:12px;">Polygons Loaded</div>
+                <div style="margin-top:auto; padding-top:12px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="font-size:12px; color:#64748b;">Total Space: <strong>${fmt(totalAreaB)} km²</strong></div>
+                    ${!showProcessed ? `<div style="font-size:12px; color:#16a34a;">Covered Space: <strong>${fmt(totalCovered)} km²</strong></div>` : ''}
+                </div>
+            </div>
+        `;
+
+        if (showProcessed) {
+            html += solidArrow;
+            html += `
+            <!-- Col 2: Processed -->
+            <div class="stat-card" style="${cardStyle} border-color:#fde68a; background:#fffbf1;">
+                <div class="stat-card-value" style="color:#d97706; font-size:24px;">${fmt(filteredCount)}</div>
+                <div class="stat-card-label" style="font-size:12px;">Filtered Polygons</div>
+                <div style="margin-top:auto; padding-top:12px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="font-size:12px; color:#64748b;">Filtered Space: <strong>${fmt(filteredAreaB)} km²</strong></div>
+                    <div style="font-size:12px; color:#16a34a;">Covered Space: <strong>${fmt(totalCovered)} km²</strong></div>
+                </div>
+            </div>
+            `;
+        }
+
+        if (overlapCol) {
+            html += solidArrow;
+            const sumCol = results.reduce(function (acc, r) { return acc + (r['CoveredData_' + overlapCol] || 0); }, 0);
+            const sumOverlapCol = results.reduce(function (acc, r) { return acc + (r['Overlapping_' + overlapCol] || 0); }, 0);
+            let pctStr = '—';
+            if (sumCol > 0) {
+                let pctVal = (sumOverlapCol / sumCol) * 100;
+                pctStr = pctVal >= 10 ? pctVal.toFixed(1) + '%' : pctVal.toFixed(2) + '%';
+            }
+            const colPct = pctStr;
+
+            html += `
+            <!-- Col Last: Feature Match -->
+            <div class="stat-card" style="${cardStyle} border-color:#bfdbfe; background:#eff6ff;">
+                <div class="stat-card-value" style="color:#2563eb; font-size:24px;">${colPct}</div>
+                <div class="stat-card-label" style="font-size:12px;">Matched of '${overlapCol}'</div>
+                <div style="margin-top:auto; padding-top:12px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="font-size:12px; color:#64748b;">Total sum: <strong>${fmt(sumCol)}</strong></div>
+                    <div style="font-size:12px; color:#2563eb;">Matched sum: <strong>${fmt(sumOverlapCol)}</strong></div>
+                </div>
+            </div>
+            `;
+        }
+
+        html += '</div>';
 
         resultSummary.innerHTML = html;
     }

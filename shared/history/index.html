@@ -8,14 +8,14 @@
     <script>
         // Enforce strict access: Redirect if not accessed via the Alt+H shortcut
         if (sessionStorage.getItem('history_access_granted') !== 'true') {
-            window.location.replace('index.html');
+            window.location.replace('../../index.html');
         }
         // Consume the token to prevent subsequent reloads or bookmarked access
         sessionStorage.removeItem('history_access_granted');
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="shared.css">
+    <link rel="stylesheet" href="../../shared.css">
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <style>
         /* Stats Grid - 4 columns */
@@ -172,6 +172,16 @@
             color: #721c24;
         }
 
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-action {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
         .job-type {
             font-weight: 500;
         }
@@ -226,13 +236,13 @@
 
     <!-- NAVBAR -->
     <nav class="navbar">
-        <a href="index.html" class="brand">
+        <a href="../../index.html" class="brand">
             <i class="fa-solid fa-earth-americas" style="color: var(--color-primary); font-size: 24px;"></i> <span
                 style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 20px; color: var(--color-text); margin-left:8px; letter-spacing: -0.5px;">NQoS
                 Tools</span>
         </a>
         <div class="nav-menu">
-            <a href="index.html" class="nav-item">ALL TOOLS</a>
+            <a href="../../index.html" class="nav-item">ALL TOOLS</a>
         </div>
     </nav>
 
@@ -321,7 +331,11 @@
                         style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:130px;">
                         <option value="">All Statuses</option>
                         <option value="Success">Success</option>
-                        <option value="Error">Error</option>
+                        <option value="App Error">App Error</option>
+                        <option value="Input Error">Input Error</option>
+                        <option value="Export Error">Export Error</option>
+                        <option value="User Canceled Job">User Canceled Job</option>
+                        <option value="User Action">User Action (Interactions)</option>
                     </select>
                 </div>
                 <button id="btn-filter-apply"
@@ -359,7 +373,7 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-links">
-                <a href="index.html" class="footer-link">Home</a>
+                <a href="../../index.html" class="footer-link">Home</a>
                 <a href="#" class="footer-link">Features</a>
                 <a href="#" class="footer-link">Privacy Policy</a>
             </div>
@@ -367,7 +381,7 @@
         </div>
     </footer>
 
-    <script src="logTracker.js"></script>
+    <script src="./logTracker.js"></script>
 </body>
 
 </html>

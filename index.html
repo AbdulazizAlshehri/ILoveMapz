@@ -13,113 +13,15 @@
     <link rel="stylesheet" href="shared.css">
     <style>
         body {
-            background-color: #f8f9fa;
-            background-image:
-                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-            background-size: 10px 10px;
+            background-color: #F8FAFC;
         }
 
-        .card-badge {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.04);
-            color: var(--color-text-muted);
-            font-size: 0;
-            /* Hide the category text */
-        }
-
-        .card-badge i {
-            font-size: 12px;
-            /* Restore the icon visibility */
-        }
-
-        /* ── Card accent bar ──────────────────────────────── */
-        .tool-card {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .tool-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            border-radius: var(--radius-md) var(--radius-md) 0 0;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .tool-card:hover::before {
-            opacity: 1;
-        }
-
-        .card-conversion::before {
-            background: #e65100;
-        }
-
-        .tool-card.card-conversion {
-            background: radial-gradient(circle at 100% 0%, rgba(230, 81, 0, 0.08) 0%, transparent 60%), #ffffff;
-        }
-
-        .card-visualization::before {
-            background: #2e7d32;
-        }
-
-        .tool-card.card-visualization {
-            background: radial-gradient(circle at 100% 0%, rgba(46, 125, 50, 0.08) 0%, transparent 60%), #ffffff;
-        }
-
-        .card-analysis::before {
-            background: #1565c0;
-        }
-
-        .tool-card.card-analysis {
-            background: radial-gradient(circle at 100% 0%, rgba(21, 101, 192, 0.08) 0%, transparent 60%), #ffffff;
-        }
-
-        /* Icon colors per category */
-        .card-conversion .tool-icon {
-            color: #e65100;
-        }
-
-        .card-visualization .tool-icon {
-            color: #2e7d32;
-        }
-
-        .card-analysis .tool-icon {
-            color: #1565c0;
-        }
-
-        /* ── Grid per section ─────────────────────────────── */
-        .tools-grid {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 20px;
-        }
-
-        .tool-card {
-            width: 300px;
-            min-height: 200px;
-        }
-
-        /* ── Main content padding ─────────────────────────── */
+        /* ── Main content ─────────────────────────────────── */
         main.container {
             padding-top: 12px;
             padding-bottom: 40px;
             width: 100%;
             max-width: 95%;
-            /* Wider landing page */
             margin: 0 auto;
         }
 
@@ -133,44 +35,166 @@
         }
 
         .filter-btn {
-            background-color: #ffffff;
-            border: 1px solid var(--color-border);
-            border-radius: 20px;
-            padding: 8px 20px;
+            background-color: transparent;
+            border: none;
+            border-radius: 9999px;
+            padding: 8px 24px;
             font-size: 14px;
-            font-weight: 600;
-            color: var(--color-text-muted);
+            font-weight: 500;
+            color: #64748B;
             cursor: pointer;
             transition: all 0.2s ease;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
         .filter-btn:hover {
-            color: var(--color-text);
-            border-color: #adb5bd;
-            transform: translateY(-1px);
+            color: #1E293B;
+            background-color: #F1F5F9;
         }
 
         .filter-btn.active {
-            background-color: var(--color-primary);
-            color: #ffffff;
-            border-color: var(--color-primary);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: #1E293B;
+            color: #FFFFFF;
+            font-weight: 600;
         }
 
-        /* ── Disabled Card State ─────────────────────────── */
+        /* ── Grid ─────────────────────────────────────────── */
+        .tools-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        /* ── Card ─────────────────────────────────────────── */
+        .tool-card {
+            width: 320px;
+            height: 250px;
+            /* fixed — fits 3-line desc + 2-line IO comfortably */
+            background: #FFFFFF;
+            border: 2px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            position: relative;
+        }
+
+        /* Hover: coloured border per category, no lift */
+        .tool-card.card-conversion:hover {
+            border-color: #F97316;
+        }
+
+        .tool-card.card-visualization:hover {
+            border-color: #10B981;
+        }
+
+        .tool-card.card-analysis:hover {
+            border-color: #7C3AED;
+        }
+
+        /* ── Icon Tile ────────────────────────────────────── */
+        .card-icon-tile {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: #fff;
+            flex-shrink: 0;
+            margin-bottom: 4px;
+        }
+
+        .card-conversion .card-icon-tile {
+            background: #F97316;
+        }
+
+        .card-visualization .card-icon-tile {
+            background: #10B981;
+        }
+
+        .card-analysis .card-icon-tile {
+            background: #7C3AED;
+        }
+
+        /* ── Title & Desc ─────────────────────────────────── */
+        .tool-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0F172A;
+            line-height: 1.3;
+            margin: 0;
+        }
+
+        .tool-desc {
+            font-size: 13px;
+            color: #64748B;
+            line-height: 1.5;
+            height: calc(13px * 1.5 * 3);
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            line-clamp: 3;
+            margin: 0;
+        }
+
+        /* ── IO Strip ─────────────────────────────────────── */
+        .tool-io {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            /* allow wrapping so all IO is always visible */
+            gap: 5px;
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid #F1F5F9;
+            font-size: 11px;
+            color: #94A3B8;
+        }
+
+        /* IO text spans: truncate gracefully if too long */
+        .tool-io>span:not(.io-label):not(.io-sep) {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+
+        .io-label {
+            font-weight: 700;
+            font-size: 9px;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        .io-label.in {
+            background: #EEF2FF;
+            color: #6366F1;
+        }
+
+        .io-label.out {
+            background: #F0FDF4;
+            color: #10B981;
+        }
+
+        .io-sep {
+            color: #CBD5E1;
+            font-size: 12px;
+        }
+
+        /* ── Disabled ─────────────────────────────────────── */
         .tool-card.disabled {
-            opacity: 0.6;
-            filter: grayscale(0.8);
+            opacity: 0.5;
+            filter: grayscale(1);
             cursor: not-allowed;
             pointer-events: none;
-            user-select: none;
-            transform: none !important;
-            box-shadow: var(--shadow-card) !important;
-        }
-
-        .tool-card.disabled::before {
-            display: none !important;
         }
     </style>
 </head>
@@ -191,7 +215,8 @@
 
     <!-- HERO -->
     <header class="hero-landing">
-        <h1 class="hero-title">Every tool you need to work with Maps and Spatial Data</h1>
+        <h1 class="hero-title" style="color: #0F172A; font-weight: 800; letter-spacing: -1px;">Every tool for your
+            Spatial Data</h1>
         <p class="hero-subtitle">Optimize, convert, and analyze your KMZ and Excel files in one place.</p>
     </header>
 
@@ -212,51 +237,119 @@
 
         <div class="tools-grid">
 
-            <!-- CONVERSION TOOLS -->
+            <!-- Excel to KMZ -->
             <a href="ExcelToKMZ/index.html" class="tool-card card-conversion">
-                <span class="card-badge badge-conversion"><i class="fa-solid fa-arrows-rotate"></i> Conversion</span>
-                <i class="fa-solid fa-file-excel tool-icon"></i>
-                <h3 class="tool-title">Excel to KMZ Points</h3>
+                <div class="card-icon-tile"><i class="fa-solid fa-file-arrow-up"></i></div>
+                <h3 class="tool-title">Excel to KMZ</h3>
                 <p class="tool-desc">Transform spreadsheet data into Google Earth visualization maps.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>Excel, CSV</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>KMZ</span>
+                </div>
             </a>
 
+            <!-- KMZ to Excel -->
             <a href="KMZtoExcel/index.html" class="tool-card card-conversion">
-                <span class="card-badge badge-conversion"><i class="fa-solid fa-arrows-rotate"></i> Conversion</span>
-                <i class="fa-solid fa-file-csv tool-icon"></i>
+                <div class="card-icon-tile"><i class="fa-solid fa-file-arrow-down"></i></div>
                 <h3 class="tool-title">KMZ to Excel</h3>
                 <p class="tool-desc">Extract sites, coordinates, and metadata from KML files to Excel.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>KML, KMZ</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>Excel</span>
+                </div>
             </a>
 
-            <!-- VISUALIZATION TOOLS -->
+            <!-- KMZ Viewer -->
             <a href="KMZPreview/index.html" class="tool-card card-visualization">
-                <span class="card-badge badge-visualization"><i class="fa-solid fa-map"></i> Visualization</span>
-                <i class="fa-solid fa-map-location-dot tool-icon"></i>
-                <h3 class="tool-title">KMZ Preview</h3>
+                <div class="card-icon-tile"><i class="fa-solid fa-map"></i></div>
+                <h3 class="tool-title">KMZ Viewer</h3>
                 <p class="tool-desc">Instant web-based map preview for your KML and KMZ files.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>KML, KMZ</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>Interactive Map</span>
+                </div>
             </a>
 
+            <!-- KMZ Feature Auditor -->
             <a href="KMZFieldAuditor/index.html" class="tool-card card-visualization">
-                <span class="card-badge badge-visualization"><i class="fa-solid fa-map"></i> Visualization</span>
-                <i class="fa-solid fa-magnifying-glass-location tool-icon"></i>
-                <h3 class="tool-title">KMZ Field Auditor</h3>
+                <div class="card-icon-tile"><i class="fa-solid fa-magnifying-glass-location"></i></div>
+                <h3 class="tool-title">KMZ Feature Auditor</h3>
                 <p class="tool-desc">Walk through Excel rows, zoom to matching map features, and annotate each one for
                     export.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>KMZ + Excel</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>Annotated KMZ</span>
+                </div>
             </a>
 
-            <!-- ANALYSIS TOOLS -->
-            <a href="SiteRadiusGenerator/index.html" class="tool-card card-analysis">
-                <span class="card-badge badge-analysis"><i class="fa-solid fa-chart-bar"></i> Analysis</span>
-                <i class="fa-solid fa-bullseye tool-icon"></i>
-                <h3 class="tool-title">Site Radius</h3>
-                <p class="tool-desc">Create coverage circles (donuts) around your sites for Google Earth.</p>
+            <!-- KMZ Style Mapper -->
+            <a href="KMZColorCoder/index.html" class="tool-card card-visualization">
+                <div class="card-icon-tile"><i class="fa-solid fa-palette"></i></div>
+                <h3 class="tool-title">KMZ Style Mapper</h3>
+                <p class="tool-desc">Color-code map polygons and points based on an Excel dataset.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>KMZ + Excel</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>Styled KMZ</span>
+                </div>
             </a>
 
+            <!-- Point Buffer -->
+            <a href="PointsBuffer/index.html" class="tool-card card-analysis">
+                <div class="card-icon-tile"><i class="fa-solid fa-circle-dot"></i></div>
+                <h3 class="tool-title">Point Buffer</h3>
+                <p class="tool-desc">Generate circular buffer zones around point coordinates for spatial analysis.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>Excel / CSV</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>KMZ Circles</span>
+                </div>
+            </a>
+
+            <!-- Polygons Overlap -->
             <a href="KMZOverlap/index.html" class="tool-card card-analysis">
-                <span class="card-badge badge-analysis"><i class="fa-solid fa-chart-bar"></i> Analysis</span>
-                <i class="fa-solid fa-object-group tool-icon"></i>
-                <h3 class="tool-title">Calculate Overlap</h3>
+                <div class="card-icon-tile"><i class="fa-solid fa-layer-group"></i></div>
+                <h3 class="tool-title">Polygons Overlap</h3>
                 <p class="tool-desc">Analyze spatial overlap percentages between two KMZ layers.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>2 × KMZ</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>Excel Stats</span>
+                </div>
             </a>
+
+            <!-- Nearest Polygon -->
+            <a href="NearestPolygon/index.html" class="tool-card card-analysis">
+                <div class="card-icon-tile"><i class="fa-solid fa-crosshairs"></i></div>
+                <h3 class="tool-title">Nearest Polygon</h3>
+                <p class="tool-desc">Map point coordinates to their containing polygons and find nearest neighbors.</p>
+                <div class="tool-io">
+                    <span class="io-label in">IN</span>
+                    <span>Excel + KMZ</span>
+                    <span class="io-sep">→</span>
+                    <span class="io-label out">OUT</span>
+                    <span>Excel Results</span>
+                </div>
+            </a>
+
 
         </div>
     </main>
@@ -266,12 +359,12 @@
         <div class="container">
             <div class="footer-links">
                 <a href="#" class="footer-link">Home</a>
-                <!-- <a href="history.html" class="footer-link">History</a> -->
+                <!-- <a href="shared/history/index.html" class="footer-link">History</a> -->
                 <a href="#" class="footer-link">Privacy Policy</a>
                 <a href="#" class="footer-link">Contact</a>
             </div>
-            <p class="footer-copy">© 2026 NQoS Tools. All rights reserved. <span
-                    id="app-version">v2026.02.28-1856-dev</span></p>
+            <p class="footer-copy">© 2026 NQoS Tools. All rights reserved. <span id="app-version">v2026.03.06-0805-dev</span>
+            </p>
         </div>
     </footer>
 
@@ -283,7 +376,7 @@
                 event.preventDefault();
                 // Grant access token for history page validation
                 sessionStorage.setItem('history_access_granted', 'true');
-                window.location.href = 'history.html';
+                window.location.href = 'shared/history/index.html';
             }
         });
 

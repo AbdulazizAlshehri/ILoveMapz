@@ -282,9 +282,8 @@ async function processKmzFile(file) {
             const loaded = Math.min(i + CHUNK, total);
             updateLoadingProgress(loaded, total, total ? `${loaded} / ${total} features` : 'Rendering…');
 
-            // Yield so the browser stays responsive — setTimeout(0) unlike
-            // requestAnimationFrame continues firing even in background tabs.
-            await new Promise(resolve => setTimeout(resolve, 0));
+            // Yield so the browser stays responsive without background throttling
+            await yieldToMain();
         }
 
         const bounds = layer.getBounds();

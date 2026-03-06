@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnDownload.addEventListener('click', () => {
         if (generatedKmzBlob) {
-            const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Radius.kmz";
+            const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Buffer.kmz";
             saveAs(generatedKmzBlob, outName);
         }
     });
@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showView(processingView);
         updateProgress(10, "Generating circles...");
 
-        const jobId = JobTracker.start('SiteRadiusGenerator', [currentFile]);
+        const jobId = JobTracker.start('PointsBuffer', [currentFile]);
 
         // Non-blocking loop
         setTimeout(async () => {
@@ -187,23 +187,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error("No valid coordinates found in file.");
                 }
 
-                updateProgress(80, "Compressing KMZ...", `Generated ${results.count.toLocaleString()} sites`);
+                updateProgress(80, "Compressing KMZ...", `Generated ${formatNumber(results.count)} sites`);
                 const zip = new JSZip();
                 zip.file("doc.kml", results.kml);
 
                 generatedKmzBlob = await zip.generateAsync({ type: "blob" });
 
-                const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Radius.kmz";
+                const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Buffer.kmz";
                 JobTracker.finish(jobId, [new File([generatedKmzBlob], outName)]);
 
                 updateProgress(100, "Done!");
                 if (resultSummary) {
                     resultSummary.innerHTML = `
-                        <div class="stat-box success">
-                            <span class="stat-value">${results.count.toLocaleString()}</span>
-                            <span class="stat-label">Sites Generated</span>
+                        <div class="stats-container">
+                            <div class="stat-card solid-success">
+                                <div class="stat-card-value">${formatNumber(results.count)}</div>
+                                <div class="stat-card-label">Points Processed</div>
+                            </div>
                         </div>
                     `;
+                    resultSummary.style.background = 'transparent';
+                    resultSummary.style.padding = '0';
                 }
                 showView(resultView);
 
@@ -284,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Site Radius Generation</name>
+    <name>Points Buffer</name>
     ${styles}
     ${kmlBody}
   </Document>

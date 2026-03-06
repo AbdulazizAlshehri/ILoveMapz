@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (resultSummary) {
                     resultSummary.innerHTML = `
                         <div class="stat-box success">
-                            <span class="stat-value">${currentFiles.length.toLocaleString()}</span>
+                            <span class="stat-value">${formatNumber(currentFiles.length)}</span>
                             <span class="stat-label">Files Merged</span>
                         </div>
                     `;

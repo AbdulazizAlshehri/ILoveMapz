@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                updateProgress(80, "Compressing to KMZ...", `Converted ${results.validCount.toLocaleString()} rows`);
+                updateProgress(80, "Compressing to KMZ...", `Converted ${formatNumber(results.validCount)} rows`);
                 const zip = new JSZip();
                 zip.file("doc.kml", results.kml);
 
@@ -467,20 +467,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateProgress(100, "Done!");
                 setTimeout(() => {
                     showView(resultView);
-                    resultSummary.innerHTML = `
-                        <div class="stat-box success">
-                            <span class="stat-value">${results.validCount.toLocaleString()}</span>
-                            <span class="stat-label">Converted</span>
-                        </div>
+                    let statsHtml = `
+                        <div class="stats-container">
+                            <div class="stat-card solid-success">
+                                <div class="stat-card-value">${formatNumber(results.validCount)}</div>
+                                <div class="stat-card-label">Converted</div>
+                            </div>
                     `;
                     if (results.errorCount > 0) {
-                        resultSummary.innerHTML += `
-                            <div class="stat-box error">
-                                <span class="stat-value">${results.errorCount.toLocaleString()}</span>
-                                <span class="stat-label">Skipped</span>
+                        statsHtml += `
+                            <div class="stat-card solid-danger">
+                                <div class="stat-card-value">${formatNumber(results.errorCount)}</div>
+                                <div class="stat-card-label">Skipped</div>
                             </div>
                         `;
                     }
+                    statsHtml += `</div>`;
+                    resultSummary.innerHTML = statsHtml;
+                    resultSummary.style.background = 'transparent';
+                    resultSummary.style.padding = '0';
 
                     // Auto-download on success
                     if (generatedKmzBlob) {
@@ -517,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         rows.forEach((row, i) => {
             // Update progress roughly
-            if (i % 200 === 0) updateProgress(10 + (i / total) * 30, "Parsing rows...", `Processed ${i.toLocaleString()} / ${total.toLocaleString()} rows`);
+            if (i % 200 === 0) updateProgress(10 + (i / total) * 30, "Parsing rows...", `Processed ${formatNumber(i)} / ${formatNumber(total)} rows`);
 
             if (!row || row.length === 0 || row.every(cell => !cell)) return;
 

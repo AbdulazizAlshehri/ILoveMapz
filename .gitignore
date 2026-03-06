@@ -5,5 +5,5 @@ node_modules/
 *.kml
 *.xlsx
 *.csv
-!test_data.csv
 .vscode/
+planned_apps.md

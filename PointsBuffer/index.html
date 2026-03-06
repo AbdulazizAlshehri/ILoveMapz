@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Site Radius Generator - NQoS Tools</title>
+    <title>Point Buffer - NQoS Tools</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../shared.css">
@@ -19,7 +19,9 @@
     <!-- NAVBAR -->
     <nav class="navbar">
         <a href="../index.html" class="brand">
-            <i class="fa-solid fa-earth-americas" style="color: var(--color-primary); font-size: 24px;"></i> <span style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 20px; color: var(--color-text); margin-left:8px; letter-spacing: -0.5px;">NQoS Tools</span>
+            <i class="fa-solid fa-earth-americas" style="color: var(--color-primary); font-size: 24px;"></i> <span
+                style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 20px; color: var(--color-text); margin-left:8px; letter-spacing: -0.5px;">NQoS
+                Tools</span>
         </a>
         <div class="nav-menu">
             <a href="../index.html" class="nav-item">ALL TOOLS</a>
@@ -30,8 +32,8 @@
     <div class="tool-stage">
 
         <div class="tool-header">
-            <h1>Site Radius Generator</h1>
-            <p>Generate coverage circles around your sites for Google Earth.</p>
+            <h1>Point Buffer</h1>
+            <p>Create circular buffer zones around your point coordinates and export to KMZ.</p>
         </div>
 
         <!-- VIEW 1: UPLOAD -->
@@ -39,10 +41,10 @@
             <div class="file-drop-container mode-single">
                 <div class="file-drop-zone" id="drop-zone-main">
                     <i class="fa-solid fa-circle-dot drop-icon"></i>
-                    <h3 class="drop-title">Upload Excel/CSV File</h3>
-                    <p class="drop-subtitle">Drag & drop your file here or click to select</p>
+                    <h3 class="drop-title">Upload Excel / CSV File</h3>
+                    <p class="drop-subtitle">Drag &amp; drop your file here or click to select</p>
                     <button class="btn-select-file">
-                        <i class="fa-solid fa-folder-open"></i> Select Excel File
+                        <i class="fa-solid fa-folder-open"></i> Select File
                     </button>
                     <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none;">
                     <div class="file-info"></div>
@@ -59,7 +61,7 @@
                         style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
                         <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #2c3e50;">
                             <i class="fa-solid fa-gear" style="color: var(--color-primary); margin-right: 8px;"></i>
-                            Configure Radius
+                            Configure Buffer
                         </h3>
 
                         <!-- Uploaded File Display -->
@@ -94,23 +96,22 @@
 
                         <div>
                             <label for="name-select"
-                                style="display: block; font-size: 13px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Site
-                                Name/ID
-                                <span style="color: #95a5a6; font-weight: 400;">(Optional)</span></label>
+                                style="display: block; font-size: 13px; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">Point
+                                Name / ID <span style="color: #95a5a6; font-weight: 400;">(Optional)</span></label>
                             <select id="name-select" class="form-select"
                                 style="width: 100%; padding: 10px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;"></select>
                         </div>
                     </div>
 
-                    <!-- Radius Settings -->
+                    <!-- Buffer Settings -->
                     <div style="margin-bottom: 24px; padding: 20px; background: #fafafa; border-radius: 8px;">
                         <label
-                            style="display:block; margin-bottom:8px; font-size: 14px; font-weight: 600; color: #2c3e50;">Radius
-                            (Meters):</label>
+                            style="display:block; margin-bottom:8px; font-size: 14px; font-weight: 600; color: #2c3e50;">Buffer
+                            Radius (Meters):</label>
                         <input type="text" id="radius-input" value="100" placeholder="e.g. 100, 200, 500"
                             style="padding: 10px 12px; width: 100%; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;">
-                        <div style="font-size:12px; color:#7f8c8d; margin-top:6px;">Comma separated for multiple rings
-                        </div>
+                        <div style="font-size:12px; color:#7f8c8d; margin-top:6px;">Comma-separated for multiple
+                            concentric rings</div>
 
                         <div style="margin-top:20px; display:flex; gap:20px; align-items:center;">
                             <div>
@@ -141,20 +142,20 @@
 
         <!-- VIEW 3: PROCESSING -->
         <div id="processing-view" class="view hidden" style="text-align: center;">
-            <h3 style="margin-bottom: 20px;">Generating...</h3>
+            <h3 style="margin-bottom: 20px;">Generating buffers...</h3>
             <div class="progress-container"
                 style="width: 100%; max-width: 400px; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; margin: 0 auto;">
                 <div id="progress-bar"
                     style="width: 0%; height: 100%; background: var(--color-primary); transition: width 0.3s;"></div>
             </div>
-            <p id="progress-text" style="margin-top: 15px; color: #666;">Processing geometry...</p>
+            <p id="progress-text" style="margin-top: 15px; color: #666;">Processing coordinates...</p>
             <p id="progress-details" style="margin-top: 5px; font-size: 14px; color: #888;"></p>
         </div>
 
         <!-- VIEW 4: RESULT -->
         <div id="result-view" class="view hidden" style="text-align:center;">
             <i class="fa-solid fa-check-circle" style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
-            <h2 style="margin-bottom:20px;">Generation Completed!</h2>
+            <h2 style="margin-bottom:20px;">Buffers Generated!</h2>
             <div id="result-summary" class="result-stats-board"></div>
             <button class="btn-action-main" id="btn-download">
                 <i class="fa-solid fa-download"></i> Download Again

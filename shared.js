@@ -23,6 +23,32 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+// Ensure saveAs is globally available to all apps
+window.saveAs = window.saveAs || function (blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 150);
+};
+
+// --- Unthrottled Background Loop Yielder ---
+// Browsers throttle setTimeout(0) to 1000ms in background tabs after a few minutes.
+// MessageChannel tasks are treated as normal macrotasks but bypass background clamping.
+window.yieldToMain = function () {
+    return new Promise(resolve => {
+        const { port1, port2 } = new MessageChannel();
+        port1.onmessage = resolve;
+        port2.postMessage(null);
+    });
+};
+
 // --- 1. Session & Identity ---
 async function initializeSession() {
     // Persistent Visitor ID
@@ -160,7 +186,7 @@ function getCleanSession() {
 }
 
 function trackPageVisit() {
-    if (window.location.pathname.includes('history.html')) return; // Don't log admin view as visit
+    if (window.location.pathname.includes('shared/history/index.html')) return; // Don't log admin view as visit
 
     // Debounce/Check duplicate visits in short time? No, simplified req wants ALL info.
     logActivity('VISIT', document.title, {
@@ -195,9 +221,9 @@ window.JobTracker = {
         }
     },
 
-    finish: (jobContext, outputFiles = []) => {
+    success: (jobContext, outputFiles = []) => {
         try {
-            console.log(`[JobTracker] Finishing ${jobContext?.tool}`, outputFiles);
+            console.log(`[JobTracker] Success ${jobContext?.tool}`, outputFiles);
             if (!jobContext) return;
 
             const outputs = Array.from(outputFiles || []).map(f => ({
@@ -216,23 +242,59 @@ window.JobTracker = {
                 duration: Date.now() - (jobContext.startTime || Date.now())
             });
         } catch (e) {
-            console.error("[JobTracker] Finish Error", e);
+            console.error("[JobTracker] Success Error", e);
         }
     },
 
-    fail: (jobContext, errorMessage) => {
+    error: (jobContext, errorType = 'App Error', errorMessage = 'Unknown Error') => {
         try {
-            console.error(`[JobTracker] Failed ${jobContext?.tool}: ${errorMessage}`);
+            console.error(`[JobTracker] ${errorType} on ${jobContext?.tool}: ${errorMessage}`);
             if (!jobContext) return;
 
             logActivity('JOB', jobContext.tool || 'Unknown Tool', {
-                status: 'Error',
+                status: errorType,
                 files: jobContext.inputs || [],
                 message: errorMessage,
                 duration: Date.now() - (jobContext.startTime || Date.now())
             });
         } catch (e) {
-            console.error("[JobTracker] Fail Error", e);
+            console.error("[JobTracker] Error Logging Failed", e);
+        }
+    },
+
+    cancel: (jobContext, cancelReason = 'User canceled operation') => {
+        try {
+            console.log(`[JobTracker] Cancelled ${jobContext?.tool}: ${cancelReason}`);
+            if (!jobContext) return;
+
+            logActivity('JOB', jobContext.tool || 'Unknown Tool', {
+                status: 'User Canceled Job',
+                files: jobContext.inputs || [],
+                message: cancelReason,
+                duration: Date.now() - (jobContext.startTime || Date.now())
+            });
+        } catch (e) {
+            console.error("[JobTracker] Cancel Error", e);
+        }
+    },
+
+    // Legacy binding to prevent breaking existing apps while we transition
+    finish: function (jobContext, outputFiles) { this.success(jobContext, outputFiles); },
+    fail: function (jobContext, errorMessage) { this.error(jobContext, 'App Error', errorMessage); },
+
+    interaction: (jobContext, actionName, detailedMessage = '') => {
+        try {
+            console.log(`[JobTracker] Interaction on ${jobContext?.tool}: ${actionName}`);
+            if (!jobContext) return;
+
+            logActivity('INTERACTION', jobContext.tool, {
+                status: 'User Action',
+                files: jobContext.inputs || [],
+                message: detailedMessage ? `${actionName}: ${detailedMessage}` : actionName,
+                duration: 0
+            });
+        } catch (e) {
+            console.error("[JobTracker] Interaction Log Error", e);
         }
     }
 };
@@ -388,3 +450,15 @@ function setupUnifiedDropZone(zoneId, inputId, onFileSelect, onFileRemove = null
         reset: clearFiles
     };
 }
+
+function formatNumber(num) {
+    if (num == null) return '';
+    const val = Number(num);
+    if (isNaN(val)) return String(num);
+    if (Math.abs(val) >= 100) {
+        return val.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    } else {
+        return val.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+}
+

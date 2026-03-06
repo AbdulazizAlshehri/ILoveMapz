@@ -167,7 +167,7 @@ async function startConversion(file) {
                 return;
             }
 
-            updateProgress(80, "Generating Excel...", `Parsed ${placemarks.length.toLocaleString()} placemarks`);
+            updateProgress(80, "Generating Excel...", `Parsed ${formatNumber(placemarks.length)} placemarks`);
             const generatedBlob = generateExcel(placemarks, file.name);
 
             // FINISH JOB
@@ -285,11 +285,15 @@ function generateExcel(data, originalFileName) {
     setTimeout(() => {
         showView(resultView);
         resultSummary.innerHTML = `
-            <div class="stat-box success">
-                <span class="stat-value">${data.length.toLocaleString()}</span>
-                <span class="stat-label">Extracted</span>
+            <div class="stats-container">
+                <div class="stat-card solid-success">
+                    <div class="stat-card-value">${formatNumber(data.length)}</div>
+                    <div class="stat-card-label">Extracted</div>
+                </div>
             </div>
         `;
+        resultSummary.style.background = 'transparent';
+        resultSummary.style.padding = '0';
 
         // Auto-download on success
         if (generatedExcelBlob) {
