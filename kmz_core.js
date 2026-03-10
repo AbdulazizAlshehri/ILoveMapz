@@ -914,14 +914,123 @@ function injectSearchUI() {
         results.classList.remove('hidden');
     }
 
+    // ── Multi-format coordinate parser ───────────────────────────────
+    // Supported formats:
+    //   DD:  25.123456, 55.123456  |  -25.123, 55.456
+    //   DD+NSEW:  25.123N, 55.456E  |  N25.123, E55.456  |  25.123 N, 55.456 E
+    //   DMS: 25°30'15"N, 55°45'30"E  |  25°30'15" N 55°45'30" E
+    //   DDM: 25°30.5'N, 55°45.5'E
+    //   DMS (space): 25 30 15N, 55 45 30E  |  25 30 15 N, 55 45 30 E
+    function parseCoords(str) {
+        const s = str.trim();
+
+        function applyDir(v, dir) { return (dir === 'S' || dir === 'W') ? -v : v; }
+        function dms(d, m, sec)   { return +d + +m / 60 + +sec / 3600; }
+        function ddm(d, m)         { return +d + +m / 60; }
+        function valid(lat, lon)   { return Math.abs(lat) <= 90 && Math.abs(lon) <= 180; }
+
+        let m, lat, lon;
+
+        // DMS with ° ' " + optional NSEW
+        // "25°30'15.5"N, 55°45'30.5"E"  or  "N 25°30'15" E 55°45'30""
+        m = s.match(/^([NS]?)\s*(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)["″]?\s*([NS]?)\s*[,;\s]+\s*([EW]?)\s*(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)["″]?\s*([EW]?)$/i);
+        if (m) {
+            lat = applyDir(dms(m[2], m[3], m[4]), (m[1] || m[5]).toUpperCase());
+            lon = applyDir(dms(m[7], m[8], m[9]), (m[6] || m[10]).toUpperCase());
+            if (valid(lat, lon)) return { lat, lon };
+        }
+
+        // DDM with ° ' + optional NSEW
+        // "25°30.5'N, 55°45.5'E"
+        m = s.match(/^([NS]?)\s*(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)['′]?\s*([NS]?)\s*[,;\s]+\s*([EW]?)\s*(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)['′]?\s*([EW]?)$/i);
+        if (m) {
+            lat = applyDir(ddm(m[2], m[3]), (m[1] || m[4]).toUpperCase());
+            lon = applyDir(ddm(m[6], m[7]), (m[5] || m[8]).toUpperCase());
+            if (valid(lat, lon)) return { lat, lon };
+        }
+
+        // Space-separated DMS with NSEW suffix
+        // "25 30 15.5 N, 55 45 30.5 E"  or  "25 30 15N 55 45 30E"
+        m = s.match(/^(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*([NS])\s*[,;\s]+\s*(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*([EW])$/i);
+        if (m) {
+            lat = applyDir(dms(m[1], m[2], m[3]), m[4].toUpperCase());
+            lon = applyDir(dms(m[5], m[6], m[7]), m[8].toUpperCase());
+            if (valid(lat, lon)) return { lat, lon };
+        }
+
+        // DD with optional NSEW prefix or suffix
+        // "25.123N, 55.456E"  |  "N25.123, E55.456"  |  "25.123 N 55.456 E"
+        m = s.match(/^([NS]?)\s*(\d+(?:\.\d+)?)\s*([NS]?)\s*[,;\s]+\s*([EW]?)\s*(\d+(?:\.\d+)?)\s*([EW]?)$/i);
+        if (m) {
+            lat = applyDir(+m[2], (m[1] || m[3]).toUpperCase());
+            lon = applyDir(+m[5], (m[4] || m[6]).toUpperCase());
+            if (valid(lat, lon)) return { lat, lon };
+        }
+
+        // Plain signed decimal: "-25.123456, 55.123456"  |  "-25.123 55.456"
+        m = s.match(/^(-?\d+\.?\d*)\s*[,\s]\s*(-?\d+\.?\d*)$/);
+        if (m) {
+            lat = +m[1]; lon = +m[2];
+            if (valid(lat, lon)) return { lat, lon };
+        }
+
+        return null;
+    }
+
+    // Coordinate marker — persists until search field changes or is cleared
+    let _coordMarker = null;
+    function dropCoordMarker(lat, lon) {
+        if (_coordMarker) { map.removeLayer(_coordMarker); _coordMarker = null; }
+        const icon = L.divIcon({
+            className: '',
+            html: `<div class="coord-pin-wrap">
+                       <div class="coord-pin-ring"></div>
+                       <div class="coord-pin-ring"></div>
+                       <div class="coord-pin-dot"></div>
+                   </div>`,
+            iconSize: [32, 32], iconAnchor: [16, 16]
+        });
+        _coordMarker = L.marker([lat, lon], { icon, interactive: false }).addTo(map);
+    }
+    function clearCoordMarker() {
+        if (_coordMarker) { map.removeLayer(_coordMarker); _coordMarker = null; }
+    }
+
+    function goToCoords(coords) {
+        map.flyTo([coords.lat, coords.lon], 15, { duration: 0.7 });
+        dropCoordMarker(coords.lat, coords.lon);
+        closeResults();
+    }
+
+    function renderCoordHint(coords) {
+        results.innerHTML = `
+            <div class="search-result-item" id="_coord-go">
+                <span class="search-result-name">
+                    <i class="fa-solid fa-crosshairs" style="color:var(--color-primary);margin-right:5px;"></i>
+                    Go to ${coords.lat.toFixed(6)}, ${coords.lon.toFixed(6)}
+                </span>
+                <span class="search-result-layer">Press Enter or click to navigate</span>
+            </div>`;
+        results.querySelector('#_coord-go').addEventListener('click', () => goToCoords(coords));
+        results.classList.remove('hidden');
+    }
+
     input.addEventListener('input', () => {
         const raw = input.value;
+        const coords = parseCoords(raw);
+        if (coords) { renderCoordHint(coords); return; }
+        // Input no longer looks like coordinates — remove the pin
+        clearCoordMarker();
         const endsWithSpace = raw.endsWith(' '); // trailing space = exact mode
         const q = raw.trim().toLowerCase();
         renderResults(q, endsWithSpace);
     });
     input.addEventListener('keydown', e => {
         if (e.key === 'Escape') { closeResults(); input.blur(); }
+        if (e.key === 'Enter') {
+            const coords = parseCoords(input.value);
+            if (coords) { goToCoords(coords); e.preventDefault(); }
+        }
     });
     // Close when clicking outside
     document.addEventListener('click', e => {

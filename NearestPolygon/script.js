@@ -186,6 +186,15 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Shoelace formula — signed area in flat lon/lat units (used only for size comparison)
+function polygonArea(coords) {
+    let area = 0;
+    for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
+        area += (coords[i][0] + coords[j][0]) * (coords[i][1] - coords[j][1]);
+    }
+    return Math.abs(area / 2);
+}
+
 // Shortest distance from point to a line segment
 // Returns distance in meters
 function pointToSegmentDistance(lat, lon, lat1, lon1, lat2, lon2) {
@@ -304,7 +313,8 @@ async function startProcessing() {
             polygons.push({
                 name,
                 coords: coordArray,
-                bbox: { minLat, maxLat, minLon, maxLon }
+                bbox: { minLat, maxLat, minLon, maxLon },
+                area: polygonArea(coordArray)
             });
         }
 
@@ -342,13 +352,14 @@ async function startProcessing() {
                     // Bbox pre-check — skip ray-cast when point is outside the box
                     const bb = poly.bbox;
                     if (lat < bb.minLat || lat > bb.maxLat || lon < bb.minLon || lon > bb.maxLon) continue;
-                    if (pointInPolygon(point, poly.coords)) containedIn.push(poly.name);
+                    if (pointInPolygon(point, poly.coords)) containedIn.push(poly);
                 }
 
                 if (containedIn.length > 0) {
-                    const containers = containedIn.join(', ');
-                    row['Container_Polygons'] = containers;
-                    row['Nearest_Polygon'] = containers;
+                    // When nested polygons contain the point, pick the innermost (smallest area)
+                    const best = containedIn.reduce((a, b) => a.area < b.area ? a : b);
+                    row['Container_Polygons'] = best.name;
+                    row['Nearest_Polygon'] = best.name;
                     row['Distance_to_Nearest (m)'] = 0;
                     withinPolygon++;
                 } else {

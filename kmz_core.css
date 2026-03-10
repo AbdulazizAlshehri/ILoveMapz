@@ -248,6 +248,39 @@ body {
     text-align: center;
 }
 
+/* ── Coordinate pin marker ───────────────────────────────────────── */
+.coord-pin-wrap {
+    position: relative;
+    width: 32px;
+    height: 32px;
+}
+.coord-pin-dot {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px; height: 10px;
+    background: var(--color-primary);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    z-index: 2;
+}
+.coord-pin-ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px; height: 32px;
+    border: 2px solid var(--color-primary);
+    border-radius: 50%;
+    opacity: 0;
+    animation: coord-pulse 1.4s ease-out infinite;
+}
+.coord-pin-ring:nth-child(3) { animation-delay: 0.5s; }
+@keyframes coord-pulse {
+    0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 0.8; }
+    100% { transform: translate(-50%,-50%) scale(2);   opacity: 0; }
+}
+
 .layer-item {
     display: flex;
     flex-direction: column;

@@ -430,7 +430,7 @@ function updateStats() {
 function exportExcel() {
     if (!excelRows.length) { alert('No Excel data loaded.'); return; }
     const col = inpNoteCol.value.trim() || 'Audit Note';
-    const output = excelRows.map((row, i) => ({ ...row, [col]: annotations[i]?.trim() || 'skipped!' }));
+    const output = excelRows.map((row, i) => ({ ...row, [col]: annotations[i]?.trim() || '' }));
     const ws = XLSX.utils.json_to_sheet(output);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Audit');
