@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCancel.addEventListener('click', resetApp);
     btnRestart.addEventListener('click', resetApp);
 
-    btnGenerate.addEventListener('click', () => {
+    btnGenerate.addEventListener('click', async () => {
         const config = {
             latIndex: latSelect.value,
             lonIndex: lonSelect.value,
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        startGeneration(config);
+        await startGeneration(config);
     });
 
     btnDownload.addEventListener('click', () => {
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function startGeneration(config) {
+    async function startGeneration(config) {
         // Parse Radii
         const radii = config.radiusStr.split(',')
             .map(s => parseFloat(s.trim()))
@@ -178,52 +178,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const jobId = JobTracker.start('PointsBuffer', [currentFile]);
 
-        // Non-blocking loop
-        setTimeout(async () => {
-            try {
-                const results = generateKML(jsonData.slice(1), config, radii); // Skip header
+        // Non-blocking execution
+        try {
+            await window.yieldToMain();
 
-                if (results.count === 0) {
-                    throw new Error("No valid coordinates found in file.");
-                }
+            const results = await generateKML(jsonData.slice(1), config, radii); // Skip header
 
-                updateProgress(80, "Compressing KMZ...", `Generated ${formatNumber(results.count)} sites`);
-                const zip = new JSZip();
-                zip.file("doc.kml", results.kml);
-
-                generatedKmzBlob = await zip.generateAsync({ type: "blob" });
-
-                const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Buffer.kmz";
-                JobTracker.finish(jobId, [new File([generatedKmzBlob], outName)]);
-
-                updateProgress(100, "Done!");
-                if (resultSummary) {
-                    resultSummary.innerHTML = `
-                        <div class="stats-container">
-                            <div class="stat-card solid-success">
-                                <div class="stat-card-value">${formatNumber(results.count)}</div>
-                                <div class="stat-card-label">Points Processed</div>
-                            </div>
-                        </div>
-                    `;
-                    resultSummary.style.background = 'transparent';
-                    resultSummary.style.padding = '0';
-                }
-                showView(resultView);
-
-                // Auto-download on success
-                saveAs(generatedKmzBlob, outName);
-
-            } catch (err) {
-                console.error(err);
-                alert("Generation failed: " + err.message);
-                JobTracker.fail(jobId, err.message);
-                resetApp();
+            if (results.count === 0) {
+                throw new Error("No valid coordinates found in file.");
             }
-        }, 100);
+
+            updateProgress(80, "Compressing KMZ...", `Generated ${formatNumber(results.count)} sites`);
+            const zip = new JSZip();
+            zip.file("doc.kml", results.kml);
+
+            generatedKmzBlob = await zip.generateAsync({ type: "blob" });
+
+            const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Buffered.kmz";
+            JobTracker.finish(jobId, [new File([generatedKmzBlob], outName)]);
+
+            updateProgress(100, "Done!");
+            if (resultSummary) {
+                resultSummary.innerHTML = `
+                    <div class="stats-container">
+                        <div class="stat-card solid-success">
+                            <div class="stat-card-value">${formatNumber(results.count)}</div>
+                            <div class="stat-card-label">Points Processed</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+                        <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+                        <span>Output File: <strong style="color: #334155;">${outName}</strong></span>
+                    </div>
+                `;
+                resultSummary.style.background = 'transparent';
+                resultSummary.style.padding = '0';
+            }
+            showView(resultView);
+
+            // Auto-download on success
+            saveAs(generatedKmzBlob, outName);
+
+        } catch (err) {
+            console.error(err);
+            alert("Generation failed: " + err.message);
+            JobTracker.fail(jobId, err.message);
+            resetApp();
+        }
     }
 
-    function generateKML(rows, config, radii) {
+    async function generateKML(rows, config, radii) {
         let kmlBody = '';
         let validCount = 0;
 
@@ -251,8 +255,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Generate Polygons
-        rows.forEach(row => {
-            if (!row || row.length === 0) return;
+        for (let idx = 0; idx < rows.length; idx++) {
+            if (idx % 100 === 0) await window.yieldToMain();
+            const row = rows[idx];
+
+            if (!row || row.length === 0) continue;
 
             const lat = parseFloat(row[config.latIndex]);
             const lon = parseFloat(row[config.lonIndex]);
@@ -283,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 kmlBody += `</Folder>`;
                 validCount++;
             }
-        });
+        }
 
         const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">

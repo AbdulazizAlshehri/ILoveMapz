@@ -162,8 +162,7 @@ auditNote.addEventListener('input', () => {
 auditNote.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        annotations[currentRow] = auditNote.value;
-        saveSession();
+        // navigateTo will handle the skipped! logic itself
         navigateTo(currentRow + 1);
     }
 });
@@ -241,7 +240,8 @@ function checkAuditReady() {
 // ─── Navigation ───────────────────────────────────────────────────
 function navigateTo(index) {
     if (!auditReady || !excelRows.length) return;
-    annotations[currentRow] = auditNote.value;
+    // Auto-mark as "skipped!" when leaving a row with no annotation
+    annotations[currentRow] = auditNote.value.trim() ? auditNote.value : 'skipped!';
     saveSession();
 
     currentRow = Math.max(0, Math.min(index, excelRows.length - 1));
@@ -430,11 +430,11 @@ function updateStats() {
 function exportExcel() {
     if (!excelRows.length) { alert('No Excel data loaded.'); return; }
     const col = inpNoteCol.value.trim() || 'Audit Note';
-    const output = excelRows.map((row, i) => ({ ...row, [col]: annotations[i] || '' }));
+    const output = excelRows.map((row, i) => ({ ...row, [col]: annotations[i]?.trim() || 'skipped!' }));
     const ws = XLSX.utils.json_to_sheet(output);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Audit');
-    const filename = `Audit_${Date.now()}.xlsx`;
+    const filename = excelFilename.textContent.split(' ')[0].replace(/\.[^/.]+$/, "") + `_Audited.xlsx`;
     XLSX.writeFile(wb, filename);
     window.JobTracker?.finish(window.JobTracker?.start('KMZFieldAuditor_Export', []), [{ name: filename, size: 0 }]);
 }

@@ -37,9 +37,8 @@ function initApp() {
     document.getElementById('btn-restart').addEventListener('click', resetApp);
     document.getElementById('btn-process').addEventListener('click', startProcessing);
     document.getElementById('btn-download').addEventListener('click', () => {
-        if (outputBlob) {
-            saveAs(outputBlob, `Colored_${mapFile.name.replace('.kml', '.kmz')}`);
-        }
+        const outName = mapFile.name.replace(/\.[^/.]+$/, "") + "_Colored.kmz";
+        saveAs(outputBlob, outName);
     });
 }
 
@@ -306,7 +305,7 @@ async function startProcessing() {
             // Update progress and yield to main thread without throttling
             const percent = 60 + Math.floor((chunkEnd / totalPlacemarks) * 20); // Scale from 60% to 80%
             updateProgress(percent, `Coloring features...`, `Processed ${chunkEnd} of ${totalPlacemarks}`);
-            await yieldToMain();
+            await window.yieldToMain();
         }
 
         updateProgress(80, "Generating new KMZ...");
@@ -321,7 +320,8 @@ async function startProcessing() {
         updateProgress(100, "Done!");
 
         if (window.JobTracker) {
-            outputBlob.name = `Colored_${mapFile.name.replace('.kml', '.kmz')}`;
+            const outName = mapFile.name.replace(/\.[^/.]+$/, "") + "_Colored.kmz";
+            outputBlob.name = outName;
             window.JobTracker.finish(jobContext, [outputBlob]);
         }
 
@@ -354,10 +354,14 @@ function showResult(matchCount, unmatchCount) {
                 <div class="stat-card-label">Defaulted</div>
             </div>
         </div>
+        <div style="margin-top: 20px; font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+            <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+            <span>Output File: <strong style="color: #334155;">${mapFile.name.replace(/\.[^/.]+$/, "")}_Colored.kmz</strong></span>
+        </div>
     `;
-    sumDiv.style.background = 'transparent';
     sumDiv.style.padding = '0';
-    saveAs(outputBlob, `Colored_${mapFile.name.replace('.kml', '.kmz')}`);
+    const outName = mapFile.name.replace(/\.[^/.]+$/, "") + "_Colored.kmz";
+    saveAs(outputBlob, outName);
     showView('result-view');
 }
 

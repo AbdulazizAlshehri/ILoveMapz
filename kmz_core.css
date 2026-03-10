@@ -58,6 +58,8 @@ body {
     overflow: hidden;
 }
 
+
+
 /* ── Left Sidebar ───────────────────────────────────────────── */
 #layer-sidebar {
     width: 220px;
@@ -861,4 +863,134 @@ body {
 #mini-map-toggle-btn:hover {
     background: white;
     color: var(--color-primary);
+}
+
+/* ── Feature Description Panel ──────────────────────────────── */
+/* Floating panel that shows polygon/feature description on click.
+   Positioned absolutely inside #map-wrap so it overlays the map.
+   Smart positioning logic lives in _positionFeatDesc() in kmz_core.js. */
+#feat-desc-panel {
+    position: absolute;
+    z-index: 950;
+    width: 369px;
+    max-width: calc(100% - 28px);
+    background: #fff;
+    border-radius: 10px;
+    /* drop-shadow (not box-shadow) so the shadow wraps the arrow tip too */
+    filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.15)) drop-shadow(0 1px 4px rgba(0, 0, 0, 0.09));
+    pointer-events: all;
+    transition: opacity 0.14s ease, transform 0.14s ease;
+    transform-origin: top left;
+}
+
+/* Callout arrow — a CSS border-triangle on ::before.
+   Four direction classes set by JS; --arrow-offset positions the tip
+   along the edge to align with the feature click point. */
+#feat-desc-panel::before {
+    content: '';
+    position: absolute;
+    border: 11px solid transparent;
+    z-index: 1;
+}
+
+/* Panel is RIGHT of feature → arrow on LEFT edge, pointing left */
+#feat-desc-panel.arrow-left::before {
+    right: 100%;
+    top: var(--arrow-offset, 50%);
+    transform: translateY(-50%);
+    border-right-color: #fff;
+}
+
+/* Panel is LEFT of feature → arrow on RIGHT edge, pointing right */
+#feat-desc-panel.arrow-right::before {
+    left: 100%;
+    top: var(--arrow-offset, 50%);
+    transform: translateY(-50%);
+    border-left-color: #fff;
+}
+
+/* Panel is BELOW feature → arrow on TOP edge, pointing up */
+#feat-desc-panel.arrow-top::before {
+    bottom: 100%;
+    left: var(--arrow-offset, 50%);
+    transform: translateX(-50%);
+    border-bottom-color: #fff;
+}
+
+/* Panel is ABOVE feature → arrow on BOTTOM edge, pointing down */
+#feat-desc-panel.arrow-bottom::before {
+    top: 100%;
+    left: var(--arrow-offset, 50%);
+    transform: translateX(-50%);
+    border-top-color: #fff;
+}
+
+#feat-desc-panel.feat-desc-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.96);
+}
+
+.feat-desc-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.07);
+    color: #777;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    z-index: 1;
+    padding: 0;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+}
+
+.feat-desc-close:hover {
+    background: rgba(231, 76, 60, 0.12);
+    color: var(--color-primary);
+}
+
+.feat-desc-body {
+    padding: 14px 36px 14px 14px;
+    overflow-y: auto;
+
+    font-size: 13px;
+    color: #333;
+    line-height: 1.5;
+    font-family: 'Inter', sans-serif;
+}
+
+.feat-desc-body strong {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    display: block;
+    margin-bottom: 6px;
+    padding-right: 10px;
+}
+
+.feat-desc-body .popup-ext-data {
+    margin-top: 4px;
+}
+
+.feat-desc-body .popup-ext-data table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.feat-desc-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.feat-desc-body::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 4px;
 }

@@ -21,7 +21,6 @@ const btnExtract = document.getElementById('btn-extract');
 const btnCancel = document.getElementById('btn-cancel');
 const fileNameDisplay = document.getElementById('file-name');
 const includeDescCheck = document.getElementById('include-desc-check');
-const stripHtmlCheck = document.getElementById('strip-html-check');
 const includeAltCheck = document.getElementById('include-alt-check');
 
 let generatedExcelBlob = null;
@@ -156,28 +155,24 @@ async function startConversion(file) {
         }
 
         updateProgress(50, "Parsing XML...");
-        // Use timeout to allow UI update
-        setTimeout(() => {
-            const placemarks = parseKML(kmlText);
 
-            if (placemarks.length === 0) {
-                alert("No placemarks found in this file.");
-                JobTracker.fail(jobId, "No placemarks found");
-                resetApp();
-                return;
-            }
+        await window.yieldToMain();
+        const placemarks = await parseKML(kmlText);
 
-            updateProgress(80, "Generating Excel...", `Parsed ${formatNumber(placemarks.length)} placemarks`);
-            const generatedBlob = generateExcel(placemarks, file.name);
+        if (placemarks.length === 0) {
+            alert("No placemarks found in this file.");
+            JobTracker.fail(jobId, "No placemarks found");
+            resetApp();
+            return;
+        }
 
-            // FINISH JOB
-            // generateExcel returns blob now (modified below)
-            const outName = file.name.replace(/\.[^/.]+$/, "") + "_extracted.xlsx";
+        updateProgress(80, "Generating Excel...", `Parsed ${formatNumber(placemarks.length)} placemarks`);
+        const generatedBlob = generateExcel(placemarks, file.name);
 
-            // Note: generateExcel was modifying globals, now we pass job cleanup
-            JobTracker.finish(jobId, [new File([generatedBlob], outName)]);
+        // FINISH JOB
+        const outName = file.name.replace(/\.[^/.]+$/, "") + "_Excel.xlsx";
 
-        }, 100);
+        JobTracker.finish(jobId, [new File([generatedBlob], outName)]);
 
     } catch (err) {
         console.error(err);
@@ -191,45 +186,61 @@ async function startConversion(file) {
 function readFileAsText(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
+        reader.onload = e => resolve(new TextDecoder("utf-8").decode(e.target.result));
         reader.onerror = reject;
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
     });
 }
 
-function parseKML(xmlString) {
+async function parseKML(xmlString) {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
     const placemarks = xmlDoc.getElementsByTagName("Placemark");
     const data = [];
 
     const includeDesc = includeDescCheck ? includeDescCheck.checked : true;
-    const stripHtml = stripHtmlCheck ? stripHtmlCheck.checked : true;
     const includeAlt = includeAltCheck ? includeAltCheck.checked : true;
 
     for (let i = 0; i < placemarks.length; i++) {
+        if (i > 0 && i % 200 === 0) await window.yieldToMain();
         const pm = placemarks[i];
 
         // Extract Name
         const nameNode = pm.getElementsByTagName("name")[0];
         const name = nameNode ? nameNode.textContent.trim() : "";
 
-        // Extract Description
+        // Extract Description and ExtendedData Attributes
         let description = "";
+        let extDataProps = {};
+
+        // Always attempt to pull ExtendedData as distinct columns (Google Earth Schema)
+        const dataNodes = ["Data", "SimpleData"];
+        for (const tagName of dataNodes) {
+            const nodes = pm.getElementsByTagName(tagName);
+            for (const node of nodes) {
+                const attrName = node.getAttribute("name");
+                const valueNode = node.getElementsByTagName("value")[0];
+                const attrValue = valueNode ? valueNode.textContent.trim() : node.textContent.trim();
+                // Assign each ExtendedData property to a unique column name
+                if (attrName && attrValue) {
+                    extDataProps[attrName] = attrValue;
+                }
+            }
+        }
+
         if (includeDesc) {
             const descNode = pm.getElementsByTagName("description")[0];
             description = descNode ? descNode.textContent.trim() : "";
 
-            if (stripHtml) {
-                // Simple HTML strip
-                const tempDiv = document.createElement("div");
-                tempDiv.innerHTML = description;
-                description = tempDiv.textContent || tempDiv.innerText || "";
-            }
+            // Always run Simple HTML strip for the main description tag
+            const tempDiv = document.createElement("div");
+            tempDiv.innerHTML = description;
+            description = tempDiv.textContent || tempDiv.innerText || "";
         }
 
-        // Extract Coordinates
+        // Extract Coordinates (Point or Polygon Centroid)
         const pointNode = pm.getElementsByTagName("Point")[0];
+        const polyNode = pm.getElementsByTagName("Polygon")[0];
         let lat = "", lon = "", alt = "";
 
         if (pointNode) {
@@ -242,6 +253,37 @@ function parseKML(xmlString) {
                     if (includeAlt) {
                         alt = coords[2] ? coords[2].trim() : "0";
                     }
+                }
+            }
+        } else if (polyNode) {
+            // Find centroid of the polygon
+            const coordNode = polyNode.getElementsByTagName("coordinates")[0];
+            if (coordNode) {
+                const coordString = coordNode.textContent.trim();
+                // KML coordinates format: lon,lat,alt lon,lat,alt ...
+                const coordPairs = coordString.split(/\s+/).filter(c => c.length > 0);
+
+                let sumLat = 0, sumLon = 0, count = 0;
+                for (const pair of coordPairs) {
+                    const coords = pair.split(',');
+                    if (coords.length >= 2) {
+                        let parsedLon = parseFloat(coords[0].trim());
+                        let parsedLat = parseFloat(coords[1].trim());
+                        if (!isNaN(parsedLon) && !isNaN(parsedLat)) {
+                            sumLon += parsedLon;
+                            sumLat += parsedLat;
+                            count++;
+                        }
+                        if (includeAlt && coords.length >= 3 && count === 1) {
+                            // Just take the first point's altitude roughly
+                            alt = coords[2].trim();
+                        }
+                    }
+                }
+
+                if (count > 0) {
+                    lon = (sumLon / count).toFixed(6);
+                    lat = (sumLat / count).toFixed(6);
                 }
             }
         }
@@ -261,7 +303,10 @@ function parseKML(xmlString) {
         };
 
         if (includeAlt) rowData["Altitude"] = alt;
-        if (includeDesc) rowData["Description"] = description;
+        if (includeDesc && description) rowData["Description"] = description;
+
+        // Merge the individual ExtendedData columns
+        Object.assign(rowData, extDataProps);
 
         data.push(rowData);
     }
@@ -274,12 +319,9 @@ function generateExcel(data, originalFileName) {
     const ws = XLSX.utils.json_to_sheet(data);
     XLSX.utils.book_append_sheet(wb, ws, "Placemarks");
 
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    generatedExcelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-    // Set filename
-    const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || originalFileName;
-    generatedFileName = `${baseName}_extracted.xlsx`;
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    generatedExcelBlob = new Blob([wbout], { type: "application/octet-stream" });
+    generatedFileName = originalFileName.replace(/\.[^/.]+$/, "") + "_Excel.xlsx";
 
     updateProgress(100, "Done!");
     setTimeout(() => {
@@ -290,6 +332,10 @@ function generateExcel(data, originalFileName) {
                     <div class="stat-card-value">${formatNumber(data.length)}</div>
                     <div class="stat-card-label">Extracted</div>
                 </div>
+            </div>
+            <div style="margin-top: 20px; font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+                <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+                <span>Output File: <strong style="color: #334155;">${generatedFileName}</strong></span>
             </div>
         `;
         resultSummary.style.background = 'transparent';

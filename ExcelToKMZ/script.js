@@ -66,6 +66,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Scale Slider display
+    const scaleValDisplay = document.getElementById('scale-val-display');
+    if (scaleInput && scaleValDisplay) {
+        scaleInput.addEventListener('input', (e) => {
+            // Ensure 1 decimal place format e.g., 1.0, 1.2, 3.0
+            scaleValDisplay.textContent = parseFloat(e.target.value).toFixed(1);
+        });
+    }
+
     // Visual Icon Picker Logic
     const iconFamilies = {
         'ms-pushpin': [
@@ -243,21 +252,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    groupSelect.addEventListener('change', updateStyleConfigUI);
+    groupSelect.addEventListener('change', () => {
+        updateStyleConfigUI();
+        const ignoreCaseCheck = document.getElementById('ignore-case-check');
+        const ignoreCaseLabel = document.getElementById('ignore-case-label');
+        if (groupSelect.value === "") {
+            ignoreCaseCheck.disabled = true;
+            if (ignoreCaseLabel) ignoreCaseLabel.style.opacity = '0.5';
+        } else {
+            ignoreCaseCheck.disabled = false;
+            if (ignoreCaseLabel) ignoreCaseLabel.style.opacity = '1';
+        }
+    });
     document.getElementById('ignore-case-check').addEventListener('change', updateStyleConfigUI);
 
     // Config Actions
     btnCancel.addEventListener('click', resetApp);
 
-    btnConvert.addEventListener('click', () => {
+    btnConvert.addEventListener('click', async () => {
         const mode = document.querySelector('input[name="coord-mode"]:checked').value;
+
+        const includeAllCols = document.getElementById('include-all-cols-check').checked;
 
         let config = {
             mode: mode,
             nameIndex: nameSelect.value,
             groupIndex: groupSelect.value,
-            scale: parseFloat(scaleInput.value) || 1.2,
+            scale: parseFloat(scaleInput.value) || 1.0,
             iconMap: currentIconSelections,
+            includeAllColumns: includeAllCols,
             latIndex: null,
             lonIndex: null,
             coordIndex: null
@@ -278,13 +301,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        startConversion(config);
+        await startConversion(config);
     });
 
     // Download / Restart
     btnDownload.addEventListener('click', () => {
         if (generatedKmzBlob) {
-            const outName = currentFile.name.replace(/\.[^/.]+$/, "") + ".kmz";
+            const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_KMZ.kmz";
             saveAs(generatedKmzBlob, outName);
         }
     });
@@ -409,8 +432,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (foundLat !== -1) latSelect.value = foundLat;
         if (foundLon !== -1) lonSelect.value = foundLon;
         if (foundName !== -1) nameSelect.value = foundName;
-        if (foundGroup !== -1) groupSelect.value = foundGroup;
+        // if (foundGroup !== -1) groupSelect.value = foundGroup; (Removed auto-detection for group per user request)
         if (foundCoord !== -1) coordSelect.value = foundCoord;
+
+        if (foundLat !== -1 || foundLon !== -1 || foundCoord !== -1 || foundName !== -1 || foundGroup !== -1) {
+            updateProgress(70, "Detected Columns Automatically!");
+        } else {
+            updateProgress(70, "Please map your data columns.");
+        }
+
+        const ignoreCaseCheck = document.getElementById('ignore-case-check');
+        const ignoreCaseLabel = document.getElementById('ignore-case-label');
+
+        // Disable ignore case initially since group is None
+        if (ignoreCaseCheck) ignoreCaseCheck.disabled = true;
+        if (ignoreCaseLabel) ignoreCaseLabel.style.opacity = '0.5';
+
+        // Reset Include All Columns Checkbox
+        const includeAllColsCheck = document.getElementById('include-all-cols-check');
+        if (includeAllColsCheck) includeAllColsCheck.checked = false;
 
         // Auto-Detect Mode (1 Column vs 2 Columns)
         if (foundLat !== -1 && foundLon !== -1) {
@@ -427,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modeRadios[0].dispatchEvent(new Event('change'));
         }
     }
-    function startConversion(config) {
+    async function startConversion(config) {
         // Init config with UI values
         config.ignoreCase = document.getElementById('ignore-case-check').checked;
 
@@ -437,71 +477,79 @@ document.addEventListener('DOMContentLoaded', () => {
         // START JOB (Moved from dead code)
         const jobId = JobTracker.start('ExcelToKMZ', [currentFile]);
 
-        // Use setTimeout to allow UI to update (non-blocking)
-        setTimeout(async () => {
-            try {
-                const results = generateKML(jsonData, config);
+        try {
+            await window.yieldToMain();
 
-                if (results.validCount === 0) {
-                    alert("No valid coordinates found!");
-                    JobTracker.fail(jobId, "No valid coordinates found");
-                    resetApp();
-                    return;
-                }
+            const results = await generateKML(jsonData, config);
 
-                updateProgress(80, "Compressing to KMZ...", `Converted ${formatNumber(results.validCount)} rows`);
-                const zip = new JSZip();
-                zip.file("doc.kml", results.kml);
-
-                generatedKmzBlob = await zip.generateAsync({ type: "blob" });
-
-                const outName = currentFile.name.replace(/\.[^/.]+$/, "") + ".kmz";
-
-                // Note: We don't auto-download here, we wait for user.
-                // But for tracking purposes, the "Work" is done.
-                // Ideally we track when they download, but tracking "Conversion Success" is better here.
-                // We'll pass the blob to finish() so it logs size.
-
-                JobTracker.finish(jobId, [new File([generatedKmzBlob], outName)]);
-
-                updateProgress(100, "Done!");
-                setTimeout(() => {
-                    showView(resultView);
-                    let statsHtml = `
-                        <div class="stats-container">
-                            <div class="stat-card solid-success">
-                                <div class="stat-card-value">${formatNumber(results.validCount)}</div>
-                                <div class="stat-card-label">Converted</div>
-                            </div>
-                    `;
-                    if (results.errorCount > 0) {
-                        statsHtml += `
-                            <div class="stat-card solid-danger">
-                                <div class="stat-card-value">${formatNumber(results.errorCount)}</div>
-                                <div class="stat-card-label">Skipped</div>
-                            </div>
-                        `;
-                    }
-                    statsHtml += `</div>`;
-                    resultSummary.innerHTML = statsHtml;
-                    resultSummary.style.background = 'transparent';
-                    resultSummary.style.padding = '0';
-
-                    // Auto-download on success
-                    if (generatedKmzBlob) {
-                        saveAs(generatedKmzBlob, outName);
-                    }
-                }, 500);
-
-            } catch (err) {
-                console.error(err);
-                alert("An error occurred: " + err.message);
-                JobTracker.fail(jobId, err.message);
+            if (results.validCount === 0) {
+                alert("No valid coordinates found!");
+                JobTracker.fail(jobId, "No valid coordinates found");
                 resetApp();
+                return;
             }
-        }, 100);
+
+            updateProgress(80, "Compressing to KMZ...", `Converted ${formatNumber(results.validCount)} rows`);
+            const zip = new JSZip();
+            zip.file("doc.kml", results.kml);
+
+            generatedKmzBlob = await zip.generateAsync({ type: "blob" });
+
+            const outName = currentFile.name.replace(/\.[^/.]+$/, "") + "_KMZ.kmz";
+            JobTracker.finish(jobId, [new File([generatedKmzBlob], outName)]);
+
+            updateProgress(100, "Done!");
+            showView(resultView);
+            let statsHtml = `
+                <div class="stats-container">
+                    <div class="stat-card solid-success">
+                        <div class="stat-card-value">${formatNumber(results.validCount)}</div>
+                        <div class="stat-card-label">Converted</div>
+                    </div>
+            `;
+            if (results.errorCount > 0) {
+                statsHtml += `
+                    <div class="stat-card solid-danger">
+                        <div class="stat-card-value">${formatNumber(results.errorCount)}</div>
+                        <div class="stat-card-label">Skipped</div>
+                    </div>
+                `;
+            }
+            statsHtml += `</div>
+                <div style="margin-top: 20px; font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+                    <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+                    <span>Output File: <strong style="color: #334155;">${outName}</strong></span>
+                </div>`;
+            resultSummary.innerHTML = statsHtml;
+            resultSummary.style.background = 'transparent';
+            resultSummary.style.padding = '0';
+
+            // Auto-download on success
+            if (generatedKmzBlob) {
+                saveAs(generatedKmzBlob, outName);
+            }
+
+            // Preview Event
+            const btnPreview = document.getElementById('btn-preview');
+            if (btnPreview) {
+                btnPreview.onclick = () => {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        sessionStorage.setItem('mapPreviewData', e.target.result);
+                        sessionStorage.setItem('mapPreviewName', outName);
+                        window.location.href = '../KMZPreview/index.html';
+                    };
+                    reader.readAsDataURL(generatedKmzBlob);
+                };
+            }
+        } catch (err) {
+            console.error(err);
+            alert("An error occurred: " + err.message);
+            JobTracker.fail(jobId, err.message);
+            resetApp();
+        }
     }
-    function generateKML(data, config) {
+    async function generateKML(data, config) {
         const headers = data[0];
         const rows = data.slice(1);
 
@@ -520,11 +568,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Map for frequency counting: groupKey -> { rawValue: count }
         let groupValueCounts = new Map();
 
-        rows.forEach((row, i) => {
-            // Update progress roughly
-            if (i % 200 === 0) updateProgress(10 + (i / total) * 30, "Parsing rows...", `Processed ${formatNumber(i)} / ${formatNumber(total)} rows`);
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
 
-            if (!row || row.length === 0 || row.every(cell => !cell)) return;
+            // Update progress roughly and yield
+            if (i > 0 && i % 200 === 0) {
+                updateProgress(10 + (i / total) * 30, "Parsing rows...", `Processed ${formatNumber(i)} / ${formatNumber(total)} rows`);
+                await window.yieldToMain();
+            }
+
+            if (!row || row.length === 0 || row.every(cell => !cell)) continue;
 
             let lat = null;
             let lon = null;
@@ -576,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     errorCount++;
                 }
             } catch (e) { errorCount++; }
-        });
+        }
 
         // Determine Final Display Names based on frequency
         groupValueCounts.forEach((counts, key) => {
@@ -649,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const kml = `<?xml version="1.0" encoding="UTF-8"?>
+        const kml = `\uFEFF<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>Converted Locations</name>
@@ -672,21 +725,23 @@ document.addEventListener('DOMContentLoaded', () => {
             styleUrl = '#style_' + groupName.replace(/[^a-zA-Z0-9]/g, '_');
         }
 
-        let description = '<table border="1" cellpadding="2" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 10pt;">';
-        headers.forEach((h, colIdx) => {
-            let val = row[colIdx];
-            if (val !== undefined && val !== null && String(val).trim() !== "") {
-                description += `<tr><td style="background-color: #f0f0f0;"><b>${escapeXml(String(h))}</b></td><td>${escapeXml(String(val))}</td></tr>`;
-            }
-        });
-        description += '</table>';
+        let description = '';
+        if (config.includeAllColumns) {
+            description = '<table border="1" cellpadding="2" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 10pt;">';
+            headers.forEach((h, colIdx) => {
+                let val = row[colIdx];
+                if (val !== undefined && val !== null && String(val).trim() !== "") {
+                    description += `<tr><td style="background-color: #f0f0f0;"><b>${escapeXml(String(h))}</b></td><td>${escapeXml(String(val))}</td></tr>`;
+                }
+            });
+            description += '</table>';
+        }
 
         return `
     <Placemark>
       <name>${name}</name>
       <styleUrl>${styleUrl}</styleUrl>
-      <description><![CDATA[${description}]]></description>
-      <Point>
+${description ? `      <description><![CDATA[${description}]]></description>\n` : ''}      <Point>
         <coordinates>${item.lon},${item.lat},0</coordinates>
       </Point>
     </Placemark>`;

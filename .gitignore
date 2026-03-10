@@ -6,4 +6,5 @@ node_modules/
 *.xlsx
 *.csv
 .vscode/
-planned_apps.md
+.claude/
+to-do.txt

@@ -46,47 +46,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function startProcessing() {
+    async function startProcessing() {
         showView(processingView);
         updateProgress(10, 'Initializing audit...');
 
         const jobId = JobTracker.start('NeighborAuditor', [currentFile]);
 
         // Simulate logic
-        setTimeout(() => {
-            try {
-                updateProgress(50, 'Processing data...', `Auditing distances... (${1} item(s))`);
+        try {
+            await window.yieldToMain();
 
-                // --- Business Logic Goes Here ---
+            updateProgress(50, 'Processing data...', `Auditing distances... (${1} item(s))`);
 
-                updateProgress(90, 'Finalizing...');
+            // --- Business Logic Goes Here ---
 
-                // Mock result
-                generatedBlob = new Blob(["Audit complete"], { type: "text/plain" });
-                generatedName = "Audit_Report.xlsx";
+            updateProgress(90, 'Finalizing...');
 
-                JobTracker.finish(jobId, [new File([generatedBlob], generatedName)]);
+            // Mock result
+            generatedBlob = new Blob(["Audit complete"], { type: "text/plain" });
+            generatedName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Neighbors.xlsx";
 
-                updateProgress(100, 'Done!');
-                if (resultSummary) {
-                    resultSummary.innerHTML = `
-                        <div class="stat-box success">
-                            <span class="stat-value">1</span>
-                            <span class="stat-label">File Audited</span>
-                        </div>
-                    `;
-                }
-                showView(resultView);
+            JobTracker.finish(jobId, [new File([generatedBlob], generatedName)]);
 
-                // Auto Download
-                saveAs(generatedBlob, generatedName);
-            } catch (err) {
-                console.error(err);
-                JobTracker.fail(jobId, err.message);
-                alert("Error during processing: " + err.message);
-                resetApp();
+            updateProgress(100, 'Done!');
+            if (resultSummary) {
+                resultSummary.innerHTML = `
+                    <div class="stat-box success">
+                        <span class="stat-value">1</span>
+                        <span class="stat-label">File Audited</span>
+                    </div>
+                    <div style="margin-top: 20px; font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+                        <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+                        <span>Output File: <strong style="color: #334155;">${generatedName}</strong></span>
+                    </div>
+                `;
             }
-        }, 1500);
+            showView(resultView);
+
+            // Auto Download
+            saveAs(generatedBlob, generatedName);
+        } catch (err) {
+            console.error(err);
+            JobTracker.fail(jobId, err.message);
+            alert("Error during processing: " + err.message);
+            resetApp();
+        }
     }
 
     function showView(view) {

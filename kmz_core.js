@@ -33,9 +33,10 @@ function makePinIcon(color) {
 // off-screen tiles so back-panning feels instant.
 const TILE_OPTIONS = {
     maxZoom: 19,
-    keepBuffer: 2,
+    keepBuffer: 4,              // pre-cache 4 tile-widths off-screen (was 2) — smoother panning
     updateWhenIdle: true,
-    updateWhenZooming: false
+    updateWhenZooming: false,
+    crossOrigin: 'anonymous'    // lets the browser share the HTTP cache across origins
 };
 const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     ...TILE_OPTIONS, attribution: '© OpenStreetMap'
@@ -55,18 +56,24 @@ const map = L.map('map', {
     wheelDebounceTime: 40,
     inertia: true,
     inertiaDeceleration: 3000,
-    inertiaMaxSpeed: 1500
+    inertiaMaxSpeed: 1500,
+    markerZoomAnimation: false,   // skip DOM-marker interpolation during zoom frames
+    bounceAtZoomLimits: false     // no zoom-limit bounce — saves layout/paint work
 }).setView([23.8859, 45.0792], 5);
 L.control.layers({ 'Streets': osmLayer, 'Satellite': satelliteLayer }).addTo(map);
 
-// GPU compositing hint — tells the browser to promote the canvas to its own
-// compositor layer so panning is hardware-accelerated with no layout reflow.
-map.once('load', () => {
-    const canvasPanes = map.getContainer().querySelectorAll('.leaflet-canvas-pane, .leaflet-tile-pane');
-    canvasPanes.forEach(el => el.style.willChange = 'transform');
-});
-// Also apply after first layer loads (map 'load' may not fire for local files)
-map.getContainer().style.willChange = 'transform';
+// GPU compositing hint — promotes each pane to its own compositor layer so
+// panning/zooming is hardware-accelerated with no layout reflow.
+// .leaflet-map-pane is the single element Leaflet CSS-transforms during pan;
+// the individual panes need their own layer so they don't dirty each other.
+function _applyWillChange() {
+    const container = map.getContainer();
+    container.querySelectorAll(
+        '.leaflet-map-pane, .leaflet-tile-pane, .leaflet-canvas-pane, .leaflet-overlay-pane'
+    ).forEach(el => { el.style.willChange = 'transform'; el.style.isolation = 'isolate'; });
+}
+map.once('load', _applyWillChange);
+map.once('layeradd', _applyWillChange); // fires even for local files with no 'load' event
 
 // ─── State ────────────────────────────────────────────────────────
 const layers = {};
@@ -84,7 +91,10 @@ let featureIndex = [];  // { name, lyr, center, layerId } — powers the search 
 // padding: 1.0 means the canvas is pre-drawn 1× viewport width/height beyond
 // every edge. During a pan, Leaflet just CSS-transforms the canvas — no redraw
 // until you've moved an entire viewport width. Doubles the smooth-pan range.
-const sharedCanvasRenderer = L.canvas({ padding: 1.0 });
+const sharedCanvasRenderer = L.canvas({
+    padding: 1.0,   // pre-draw 1× viewport beyond each edge — pan buffer
+    tolerance: 5    // px slop for click/hover hit-testing; reduces per-frame geometry checks
+});
 
 // ─── DOM ──────────────────────────────────────────────────────────
 const sidebar = document.getElementById('layer-sidebar');
@@ -181,6 +191,40 @@ const PinMarker = L.CircleMarker.extend({
     }
 });
 
+const iconCache = {};
+const ImageIconMarker = L.CircleMarker.extend({
+    _updatePath: function () {
+        if (!this._renderer._drawing) return;
+        const ctx = this._renderer._ctx;
+        const p = this._point;
+        const url = this.options.iconUrl;
+
+        if (!iconCache[url]) {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.src = url;
+            iconCache[url] = { img, loaded: false };
+            img.onload = () => {
+                iconCache[url].loaded = true;
+                if (this._renderer && this._renderer._redraw) this._renderer._redraw();
+            };
+        }
+
+        const cache = iconCache[url];
+        if (cache && cache.loaded) {
+            const s = (this.options.iconScale || 1.0);
+            const w = 32 * s;
+            const h = 32 * s;
+            ctx.drawImage(cache.img, p.x - w / 2, p.y - h, w, h);
+        } else {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = this.options.fillColor || 'gray';
+            ctx.fill();
+        }
+    }
+});
+
 // ─── KMZ File Handling ────────────────────────────────────────────
 async function handleKmzFiles(files) {
     if (!files || !files.length) return;
@@ -200,10 +244,22 @@ async function processKmzFile(file) {
     try {
         const buffer = await file.arrayBuffer();
         let kmlText = '';
+        const imageBlobs = {};
         if (/\.kmz$/i.test(file.name)) {
             const zip = await JSZip.loadAsync(buffer);
             const kmlFile = Object.keys(zip.files).find(n => /\.kml$/i.test(n));
             if (kmlFile) kmlText = await zip.file(kmlFile).async('string');
+
+            // Extract embedded images
+            for (const [filename, fileObj] of Object.entries(zip.files)) {
+                if (!fileObj.dir && filename !== kmlFile && /\.(png|jpg|jpeg|gif|svg)$/i.test(filename)) {
+                    const blob = await fileObj.async('blob');
+                    const blobUrl = URL.createObjectURL(blob);
+                    imageBlobs[filename] = blobUrl;
+                    const basename = filename.split('/').pop();
+                    if (!imageBlobs[basename]) imageBlobs[basename] = blobUrl;
+                }
+            }
         } else {
             kmlText = new TextDecoder().decode(buffer);
         }
@@ -211,6 +267,55 @@ async function processKmzFile(file) {
 
         const kmlDom = new DOMParser().parseFromString(kmlText, 'text/xml');
 
+        // --- Extract KML Styles natively as a fallback for toGeoJSON ---
+        const styleMap = {};
+        const styles = kmlDom.getElementsByTagName('Style');
+        for (let i = 0; i < styles.length; i++) {
+            const style = styles[i];
+            const id = style.getAttribute('id');
+            if (id) {
+                const sd = {};
+                const is = style.getElementsByTagName('IconStyle')[0];
+                if (is) {
+                    const c = is.getElementsByTagName('color')[0];
+                    if (c) sd.iconColor = c.textContent.trim();
+                    const s = is.getElementsByTagName('scale')[0];
+                    if (s) sd.iconScale = parseFloat(s.textContent.trim());
+                    const iNode = is.getElementsByTagName('Icon')[0];
+                    if (iNode) {
+                        const href = iNode.getElementsByTagName('href')[0];
+                        if (href) sd.iconUrl = href.textContent.trim();
+                    }
+                }
+                styleMap['#' + id] = sd;
+            }
+        }
+        const styleMaps = kmlDom.getElementsByTagName('StyleMap');
+        for (let i = 0; i < styleMaps.length; i++) {
+            const sMap = styleMaps[i];
+            const id = sMap.getAttribute('id');
+            if (id) {
+                const pairs = sMap.getElementsByTagName('Pair');
+                for (let j = 0; j < pairs.length; j++) {
+                    const key = pairs[j].getElementsByTagName('key')[0];
+                    if (key && key.textContent.trim() === 'normal') {
+                        const styleUrl = pairs[j].getElementsByTagName('styleUrl')[0];
+                        if (styleUrl && styleMap[styleUrl.textContent.trim()]) {
+                            styleMap['#' + id] = styleMap[styleUrl.textContent.trim()];
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Helper to convert KML aabbggrr to #rgba
+        const kmlToHex = (k) => {
+            let h = k.replace('#', '');
+            if (h.length === 8) return `#${h.substring(6, 8)}${h.substring(4, 6)}${h.substring(2, 4)}`; // Ignore A for now to keep solid colors inside icons, or #rrggbbaa
+            if (h.length === 6) return `#${h.substring(4, 6)}${h.substring(2, 4)}${h.substring(0, 2)}`;
+            return k;
+        };
 
         const geoJson = toGeoJSON.kml(kmlDom);
         const color = nextColor();
@@ -232,8 +337,29 @@ async function processKmzFile(file) {
                 const p = feature.properties || {};
                 let popup = '';
                 if (p.name) popup += `<strong>${p.name}</strong>`;
-                if (p.description) popup += `<div style="margin-top:4px;font-size:12px;">${p.description}</div>`;
-                if (popup) lyr.bindPopup(popup);
+
+                // If standard description exists, use it. Otherwise, collect all extended properties.
+                if (p.description) {
+                    popup += `<div style="margin-top:4px;font-size:12px;">${p.description}</div>`;
+                } else {
+                    const ignores = ['name', 'styleUrl', 'stroke', 'stroke-opacity', 'stroke-width', 'fill', 'fill-opacity', 'icon', 'marker-color', 'icon-scale', 'styleHash', 'styleMapHash'];
+                    let extHtml = '';
+                    for (const [key, val] of Object.entries(p)) {
+                        if (!ignores.includes(key) && val !== null && val !== undefined && val !== '') {
+                            extHtml += `<tr>
+                                <td style="padding: 2px 6px 2px 0; border-bottom: 1px solid #eee; color: #666; font-weight: 500;">${key}</td>
+                                <td style="padding: 2px 0 2px 6px; border-bottom: 1px solid #eee; color: #333;">${val}</td>
+                            </tr>`;
+                        }
+                    }
+                    if (extHtml) {
+                        popup += `<div class="popup-ext-data">
+                            <table>${extHtml}</table>
+                        </div>`;
+                    }
+                }
+
+
 
                 // Add named features to the search index
                 if (p.name) {
@@ -241,15 +367,47 @@ async function processKmzFile(file) {
                         const center = lyr.getLatLng ? lyr.getLatLng()
                             : lyr.getBounds ? lyr.getBounds().getCenter()
                                 : null;
-                        if (center) newFeatureEntries.push({ name: p.name, lyr, center });
+                        if (center) newFeatureEntries.push({ name: p.name, lyr, center, html: popup });
                     } catch (_) { }
+                }
+                // Bind click to show the feature description panel
+                if (popup.trim()) {
+                    const _html = popup;
+                    lyr.on('click', e => { _showFeatDesc(e, _html, lyr); });
                 }
             },
             pointToLayer(feature, latlng) {
+                const p = feature.properties || {};
+                let ptColor = p['marker-color'] || p.fill || p.stroke || color;
+                let iconUrl = p.icon;
+                let scale = p['icon-scale'] || 1.0;
+
+                // Fallback to our native parsed styles if toGeoJSON missed them
+                if (p.styleUrl && styleMap[p.styleUrl]) {
+                    const sd = styleMap[p.styleUrl];
+                    if (!iconUrl && sd.iconUrl) iconUrl = sd.iconUrl;
+                    if (!p['marker-color'] && sd.iconColor) ptColor = kmlToHex(sd.iconColor);
+                    if (!p['icon-scale'] && sd.iconScale) scale = sd.iconScale;
+                }
+
+                if (iconUrl) {
+                    const basename = iconUrl.split('/').pop();
+                    let finalUrl = iconUrl;
+                    if (imageBlobs[iconUrl]) finalUrl = imageBlobs[iconUrl];
+                    else if (imageBlobs[basename]) finalUrl = imageBlobs[basename];
+
+                    return new ImageIconMarker(latlng, {
+                        renderer: sharedCanvasRenderer,
+                        iconUrl: finalUrl,
+                        iconScale: p['icon-scale'] || 1.0,
+                        fillColor: ptColor
+                    });
+                }
+
                 return new PinMarker(latlng, {
                     renderer: sharedCanvasRenderer,
                     radius: 6,
-                    fillColor: color,
+                    fillColor: ptColor,
                     color: 'rgba(0,0,0,0.5)',
                     weight: 1, opacity: 1, fillOpacity: 1
                 });
@@ -261,7 +419,8 @@ async function processKmzFile(file) {
                     weight: p['stroke-width'] || 2,
                     opacity: p['stroke-opacity'] || 1,
                     fillColor: p.fill || color,
-                    fillOpacity: p['fill-opacity'] || 0.4
+                    fillOpacity: p['fill-opacity'] || 0.4,
+                    smoothFactor: 4      // higher = fewer canvas path segments = faster redraws
                 };
             }
         };
@@ -580,7 +739,7 @@ function applyLayerColor(id, color) {
 
 // Revert a layer to the colours embedded in the original KMZ/KML file.
 // L.geoJSON.resetStyle(feat) re-runs the style function which reads
-// p.stroke / p.fill from the feature's own KML properties.
+// p.stroke / p.fill from the feature's own KML properties. Point colors are also preserved.
 window.resetLayerColor = function (id) {
     const entry = layers[id];
     if (!entry) return;
@@ -800,8 +959,23 @@ function flyToFeature(entry) {
         if (!usedBounds) {
             map.flyTo(entry.center, Math.max(map.getZoom(), 15), { duration: 0.7 });
         }
-        // Open popup after the animation settles
-        setTimeout(() => { try { entry.lyr.openPopup(); } catch (_) { } }, 800);
+        // Show feature description panel after the fly animation settles
+        setTimeout(() => {
+            try {
+                if (entry.html) {
+                    const panel = _getFeatDescPanel();
+                    _featDescActiveLyr = entry.lyr;
+                    panel.querySelector('.feat-desc-body').innerHTML = entry.html;
+                    panel.classList.remove('feat-desc-hidden');
+                    // Position near the feature center in screen space
+                    const pt = map.latLngToContainerPoint(entry.center);
+                    const mapRect = mapWrap.getBoundingClientRect();
+                    _positionFeatDesc(pt.x + mapRect.left, pt.y + mapRect.top, panel);
+                } else {
+                    entry.lyr.openPopup();
+                }
+            } catch (_) { }
+        }, 800);
     } catch (_) { }
 }
 
@@ -990,6 +1164,133 @@ async function fetchImageryDate(latlng) {
     return null;
 }
 
+// ─── Feature Description Panel ────────────────────────────────────────────
+// Singleton floating panel that shows polygon/feature description on click.
+// Smart positioning: prefers right-of / below the click point and flips if
+// the panel would overflow the map container edges.
+let _featDescPanel = null;
+let _featDescActiveLyr = null;
+let _featDescClickGuard = false; // prevents map-click from closing the panel that just opened
+
+function _getFeatDescPanel() {
+    if (_featDescPanel) return _featDescPanel;
+    _featDescPanel = document.createElement('div');
+    _featDescPanel.id = 'feat-desc-panel';
+    _featDescPanel.classList.add('feat-desc-hidden');
+    _featDescPanel.innerHTML = `
+        <button class="feat-desc-close" title="Close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="feat-desc-body"></div>`;
+    if (mapWrap) mapWrap.appendChild(_featDescPanel);
+
+    _featDescPanel.querySelector('.feat-desc-close').addEventListener('click', e => {
+        e.stopPropagation();
+        _closeFeatDesc();
+    });
+
+    // Close when clicking on the empty map (guard prevents the opening click from closing it)
+    map.on('click', () => {
+        if (_featDescClickGuard) { _featDescClickGuard = false; return; }
+        _closeFeatDesc();
+    });
+
+    return _featDescPanel;
+}
+
+function _closeFeatDesc() {
+    if (!_featDescPanel) return;
+    _featDescPanel.classList.add('feat-desc-hidden');
+    _featDescActiveLyr = null;
+}
+
+function _showFeatDesc(e, html, lyr) {
+    const panel = _getFeatDescPanel();
+
+    // Toggle: clicking the same feature while open → close
+    if (_featDescActiveLyr === lyr && !panel.classList.contains('feat-desc-hidden')) {
+        _closeFeatDesc();
+        _featDescClickGuard = true; // absorb the map-click that will follow
+        return;
+    }
+
+    _featDescClickGuard = true; // absorb the concurrent map-click
+    _featDescActiveLyr = lyr;
+    panel.querySelector('.feat-desc-body').innerHTML = html;
+    panel.classList.remove('feat-desc-hidden');
+
+    // Capture coords now; position after the browser lays out the panel content
+    const cx = e.originalEvent.clientX;
+    const cy = e.originalEvent.clientY;
+    requestAnimationFrame(() => _positionFeatDesc(cx, cy, panel));
+}
+
+// Place the panel in the quadrant with the most available space around (cx, cy).
+// cx / cy are viewport-relative coordinates (clientX / clientY).
+function _positionFeatDesc(clientX, clientY, panel) {
+    const mapRect = mapWrap.getBoundingClientRect();
+    const W = 369; // panel CSS width
+    const margin = 14;
+    const mapW = mapRect.width;
+    const mapH = mapRect.height;
+    const availH = mapH - margin * 2;
+    const cx = clientX - mapRect.left;   // container-relative
+    const cy = clientY - mapRect.top;
+
+    // Let the body grow to fill all available map height, then scroll if needed
+    const bodyEl = panel.querySelector('.feat-desc-body');
+    if (bodyEl) bodyEl.style.maxHeight = `${availH}px`;
+
+    const H = Math.min(panel.offsetHeight || 300, availH);
+
+    // Horizontal: prefer right of click, flip left if it overflows
+    let left = cx + margin;
+    if (left + W > mapW - margin) left = cx - W - margin;
+    left = Math.max(margin, Math.min(left, mapW - W - margin));
+
+    // Vertical: prefer below click, flip above if it overflows
+    let top = cy + margin;
+    if (top + H > mapH - margin) top = cy - H - margin;
+    top = Math.max(margin, Math.min(top, mapH - H - margin));
+
+    // ── Callout arrow ──────────────────────────────────────────────
+    // Determine which edge of the panel faces the feature and where
+    // along that edge the arrow tip should sit (aligned to click point).
+    const ARROW_CLAMP = 22; // keep tip away from rounded corners
+    panel.classList.remove('arrow-left', 'arrow-right', 'arrow-top', 'arrow-bottom');
+
+    let arrowSide, arrowOffset;
+    if (left >= cx) {
+        // Panel is to the right → arrow on left edge, tip at click Y
+        arrowSide = 'left';
+        arrowOffset = Math.max(ARROW_CLAMP, Math.min(cy - top, H - ARROW_CLAMP));
+    } else if (left + W <= cx) {
+        // Panel is to the left → arrow on right edge, tip at click Y
+        arrowSide = 'right';
+        arrowOffset = Math.max(ARROW_CLAMP, Math.min(cy - top, H - ARROW_CLAMP));
+    } else if (top >= cy) {
+        // Panel is below → arrow on top edge, tip at click X
+        arrowSide = 'top';
+        arrowOffset = Math.max(ARROW_CLAMP, Math.min(cx - left, W - ARROW_CLAMP));
+    } else {
+        // Panel is above → arrow on bottom edge, tip at click X
+        arrowSide = 'bottom';
+        arrowOffset = Math.max(ARROW_CLAMP, Math.min(cx - left, W - ARROW_CLAMP));
+    }
+
+    panel.classList.add(`arrow-${arrowSide}`);
+    panel.style.setProperty('--arrow-offset', `${arrowOffset}px`);
+
+    // Animate pop-in from the arrow tip
+    const origins = { left: `left ${arrowOffset}px`, right: `right ${arrowOffset}px`,
+                      top: `${arrowOffset}px top`,   bottom: `${arrowOffset}px bottom` };
+    panel.style.transformOrigin = origins[arrowSide] || 'top left';
+
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.maxHeight = `${mapH - margin * 2}px`;
+}
+
 // ─── Shared Mini-Map Overview ──────────────────────────────────────────────
 let miniMapLeaflet = null;
 let miniViewportRect = null;
@@ -1044,9 +1345,10 @@ function initSharedMiniMap() {
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMapLeaflet);
 
-    // 3. Bind to the primary map's movement
+    // 3. Bind to the primary map's movement — debounced so rapid pan/zoom frames
+    //    don't queue redundant minimap tile fetches and viewport rect updates.
     syncMiniMapView();
-    map.on('moveend zoomend', syncMiniMapView);
+    map.on('moveend zoomend', debounce(syncMiniMapView, 120));
 }
 
 function syncMiniMapView() {
@@ -1080,3 +1382,7 @@ function showSharedMiniMap() {
 
 // Initialize the structure once the DOM is ready
 document.addEventListener('DOMContentLoaded', initSharedMiniMap);
+
+
+
+

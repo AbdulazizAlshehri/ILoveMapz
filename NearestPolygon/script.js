@@ -37,7 +37,8 @@ function initApp() {
     document.getElementById('btn-process').addEventListener('click', startProcessing);
     document.getElementById('btn-download').addEventListener('click', () => {
         if (outputBlob) {
-            saveAs(outputBlob, `NearestPolygon_${dataFile.name}`);
+            const outName = dataFile.name.replace(/\.[^/.]+$/, "") + "_Nearest.xlsx";
+            saveAs(outputBlob, outName);
         }
     });
 }
@@ -226,6 +227,14 @@ function pointToSegmentDistance(lat, lon, lat1, lon1, lat2, lon2) {
     return haversineDistance(lat, lon, yy, xx);
 }
 
+// Minimum possible distance from (lat,lon) to a bounding box.
+// Returns 0 when the point is inside the box.
+function bboxMinDist(lat, lon, bbox) {
+    const cLat = Math.max(bbox.minLat, Math.min(lat, bbox.maxLat));
+    const cLon = Math.max(bbox.minLon, Math.min(lon, bbox.maxLon));
+    return haversineDistance(lat, lon, cLat, cLon);
+}
+
 // ==============
 // PROCESSING
 // ==============
@@ -285,9 +294,17 @@ async function startProcessing() {
                 return [parseFloat(parts[0]), parseFloat(parts[1])]; // [lon, lat]
             }).filter(c => !isNaN(c[0]) && !isNaN(c[1]));
 
+            // Pre-compute bounding box for fast spatial pruning
+            let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+            for (const [lon, lat] of coordArray) {
+                if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+                if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+            }
+
             polygons.push({
-                name: name,
-                coords: coordArray // Array of [lon, lat]
+                name,
+                coords: coordArray,
+                bbox: { minLat, maxLat, minLon, maxLon }
             });
         }
 
@@ -297,11 +314,12 @@ async function startProcessing() {
 
         updateProgress(50, "Matching points to polygons...");
 
-        let matchCount = 0;
-        let unmatchCount = 0;
+        let withinPolygon = 0;   // inside at least one polygon
+        let linkedToNearest = 0; // outside but linked to nearest within threshold
+        let notLinked = 0;       // outside and beyond threshold (or no threshold set)
 
         const totalPoints = parsedExcelData.length;
-        const chunkSize = 500;
+        const chunkSize = 2000; // larger chunks — yieldToMain uses fast MessageChannel
 
         for (let i = 0; i < totalPoints; i += chunkSize) {
             const chunkEnd = Math.min(i + chunkSize, totalPoints);
@@ -311,9 +329,9 @@ async function startProcessing() {
                 const lon = parseFloat(row[lngCol]);
 
                 if (isNaN(lat) || isNaN(lon)) {
-                    row['Container_Polygon'] = "Invalid Coordinates";
+                    row['Container_Polygons'] = "Invalid Coordinates";
                     row['Nearest_Polygon'] = "";
-                    row['Distance_to_Nearest'] = "";
+                    row['Distance_to_Nearest (m)'] = "";
                     continue;
                 }
 
@@ -321,9 +339,10 @@ async function startProcessing() {
                 let containedIn = [];
 
                 for (const poly of polygons) {
-                    if (pointInPolygon(point, poly.coords)) {
-                        containedIn.push(poly.name);
-                    }
+                    // Bbox pre-check — skip ray-cast when point is outside the box
+                    const bb = poly.bbox;
+                    if (lat < bb.minLat || lat > bb.maxLat || lon < bb.minLon || lon > bb.maxLon) continue;
+                    if (pointInPolygon(point, poly.coords)) containedIn.push(poly.name);
                 }
 
                 if (containedIn.length > 0) {
@@ -331,46 +350,48 @@ async function startProcessing() {
                     row['Container_Polygons'] = containers;
                     row['Nearest_Polygon'] = containers;
                     row['Distance_to_Nearest (m)'] = 0;
-                    matchCount++;
+                    withinPolygon++;
                 } else {
                     row['Container_Polygons'] = "";
-                    unmatchCount++;
 
                     if (useThreshold) {
-                        // Find nearest polygon
-                        let minDist = Infinity;
+                        // Nearest-polygon search with bbox lower-bound pruning:
+                        // bboxMinDist gives the minimum distance a polygon could possibly
+                        // be — if it already exceeds our current best, skip all its segments.
+                        let minDist = threshold + 1; // start just above threshold so we only keep candidates ≤ threshold
                         let nearestName = "";
 
                         for (const poly of polygons) {
-                            // Check distance to all segments of the polygon
+                            // Fast lower-bound: skip if bbox is farther than current best
+                            if (bboxMinDist(lat, lon, poly.bbox) >= minDist) continue;
+
                             for (let k = 0; k < poly.coords.length - 1; k++) {
                                 const p1 = poly.coords[k];
                                 const p2 = poly.coords[k + 1];
                                 const dist = pointToSegmentDistance(lat, lon, p1[1], p1[0], p2[1], p2[0]);
-                                if (dist < minDist) {
-                                    minDist = dist;
-                                    nearestName = poly.name;
-                                }
+                                if (dist < minDist) { minDist = dist; nearestName = poly.name; }
                             }
                         }
 
-                        if (minDist <= threshold) {
+                        if (nearestName) {
                             row['Nearest_Polygon'] = nearestName;
                             row['Distance_to_Nearest (m)'] = Number(minDist.toFixed(2));
+                            linkedToNearest++;
                         } else {
                             row['Nearest_Polygon'] = "";
                             row['Distance_to_Nearest (m)'] = "";
+                            notLinked++;
                         }
                     } else {
                         row['Nearest_Polygon'] = "";
                         row['Distance_to_Nearest (m)'] = "";
+                        notLinked++;
                     }
                 }
             }
-            // Update progress
             const percent = 50 + Math.floor((chunkEnd / totalPoints) * 40);
             updateProgress(percent, `Processing points...`, `Processed ${chunkEnd} of ${totalPoints}`);
-            await yieldToMain();
+            await window.yieldToMain();
         }
 
         updateProgress(90, "Generating Excel File...");
@@ -385,12 +406,13 @@ async function startProcessing() {
         updateProgress(100, "Done!");
 
         if (window.JobTracker) {
-            outputBlob.name = `NearestPolygon_${dataFile.name}`;
+            const outName = dataFile.name.replace(/\.[^/.]+$/, "") + "_Nearest.xlsx";
+            outputBlob.name = outName;
             window.JobTracker.finish(jobContext, [outputBlob]);
         }
 
         setTimeout(() => {
-            showResult(matchCount, unmatchCount, useThreshold);
+            showResult(withinPolygon, linkedToNearest, notLinked, threshold);
         }, 500);
 
     } catch (err) {
@@ -401,26 +423,43 @@ async function startProcessing() {
     }
 }
 
-function showResult(matchCount, unmatchCount, useThreshold) {
+function showResult(withinPolygon, linkedToNearest, notLinked, threshold) {
+    const totalLinked = withinPolygon + linkedToNearest;
+    const totalPoints = totalLinked + notLinked;
     const sumDiv = document.getElementById('result-summary');
     sumDiv.innerHTML = `
         <div class="stats-container">
             <div class="stat-card solid-dark">
-                <div class="stat-card-value">${formatNumber(matchCount + unmatchCount)}</div>
+                <div class="stat-card-value">${formatNumber(totalPoints)}</div>
                 <div class="stat-card-label">Total Points</div>
             </div>
             <div class="stat-card solid-success">
-                <div class="stat-card-value">${formatNumber(matchCount)}</div>
-                <div class="stat-card-label">Inside</div>
+                <div class="stat-card-value">${formatNumber(totalLinked)}</div>
+                <div class="stat-card-label">Linked</div>
             </div>
             <div class="stat-card solid-danger">
-                <div class="stat-card-value">${formatNumber(unmatchCount)}</div>
-                <div class="stat-card-label">Outside</div>
+                <div class="stat-card-value">${formatNumber(notLinked)}</div>
+                <div class="stat-card-label">Not Linked</div>
             </div>
         </div>
-        ${useThreshold ? '<div style="font-size: 13px; color: #7f8c8d; margin-top: 15px; text-align: center;">Nearest neighbors searched for points outside polygons.</div>' : ''}
+        <div style="margin-top:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; font-size:13px; color:#334155; text-align:left; line-height:2;">
+            <div style="font-weight:700; margin-bottom:4px; color:#2c3e50;">Linked breakdown</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span style="color:#aaa; font-size:15px;">├</span>
+                <span><strong>${formatNumber(withinPolygon)}</strong> within polygons</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span style="color:#aaa; font-size:15px;">└</span>
+                <span><strong>${formatNumber(linkedToNearest)}</strong> linked to nearest polygon within <strong>${formatNumber(threshold)} m</strong></span>
+            </div>
+        </div>
+        <div style="margin-top: 14px; font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+            <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+            <span>Output File: <strong style="color: #334155;">${dataFile.name.replace(/\.[^/.]+$/, "")}_Nearest.xlsx</strong></span>
+        </div>
     `;
-    saveAs(outputBlob, `NearestPolygon_${dataFile.name}`);
+    const outName = dataFile.name.replace(/\.[^/.]+$/, "") + "_Nearest.xlsx";
+    saveAs(outputBlob, outName);
     showView('result-view');
 }
 

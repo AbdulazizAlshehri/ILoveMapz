@@ -139,12 +139,41 @@
                                 <span style="color: #95a5a6; font-weight: 400;">(Optional)</span></label>
                             <select id="group-select" class="form-select"
                                 style="width: 100%; padding: 10px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; background: white;"></select>
-                            <label
-                                style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; margin-top: 12px;">
-                                <input type="checkbox" id="ignore-case-check" checked
+                            <label id="ignore-case-label"
+                                style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; margin-top: 12px; opacity: 0.5;">
+                                <input type="checkbox" id="ignore-case-check" checked disabled
                                     style="width: 14px; height: 14px;">
                                 <span style="color: #34495e;">Ignore Case</span>
                             </label>
+                        </div>
+                    </div>
+
+                    <!-- Extra Settings -->
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 24px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #2c3e50; font-size: 13px; cursor: pointer; margin: 0; flex: 1; min-width: 200px;">
+                            <input type="checkbox" id="include-all-cols-check" style="width: 14px; height: 14px;">
+                            <span>Include all columns in the KMZ description popup</span>
+                        </label>
+
+                        <div style="display: flex; align-items: center; gap: 10px; width: 50%; min-width: 200px;">
+                            <label for="scale-input"
+                                style="font-weight: 600; color: #2c3e50; font-size: 13px; margin: 0;">Placemark
+                                Scale</label>
+                            <input type="range" id="scale-input" min="0.5" max="3" step="0.5" value="1.0"
+                                style="cursor: pointer; flex: 1; height: 2px; accent-color: #95a5a6;"
+                                list="scale-ticks">
+                            <datalist id="scale-ticks">
+                                <option value="0.5"></option>
+                                <option value="1.0"></option>
+                                <option value="1.5"></option>
+                                <option value="2.0"></option>
+                                <option value="2.5"></option>
+                                <option value="3.0"></option>
+                            </datalist>
+                            <span id="scale-val-display"
+                                style="font-size: 13px; font-weight: 600; width: 24px; text-align: right;">1.0</span>
                         </div>
                     </div>
 
@@ -161,11 +190,6 @@
                             <div id="style-config-container"
                                 style="max-height: 200px; overflow-y: auto; padding: 12px; border: 1px solid #ecf0f1; border-radius: 6px; background: white;">
                                 <!-- Group rows injected here -->
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
-                                <label style="font-size: 14px; font-weight: 600; color: #2c3e50;">Scale:</label>
-                                <input type="number" id="scale-input" value="1.2" step="0.1"
-                                    style="width: 70px; padding: 8px 12px; border: 1px solid #ecf0f1; border-radius: 6px; font-size: 14px; text-align: center;">
                             </div>
                         </div>
                     </div>
@@ -203,13 +227,21 @@
         <!-- VIEW 4: RESULT -->
         <div id="result-view" class="view hidden" style="text-align:center;">
             <i class="fa-solid fa-check-circle"
-                style="font-size: 60px; color: var(--color-primary); margin-bottom: 20px;"></i>
+                style="font-size: 60px; color: #95c11f; margin-bottom: 20px;"></i>
             <h2 style="margin-bottom:20px;">Conversion Completed!</h2>
             <div id="result-summary" class="result-stats-board"></div>
-            <button class="btn-action-main" id="btn-download">
-                <i class="fa-solid fa-download"></i> Download Again
-            </button>
-            <div style="margin-top:20px;">
+
+            <div style="display: flex; justify-content: center; gap: 15px; margin-top: 20px;">
+                <button class="btn-action-main" id="btn-download">
+                    <i class="fa-solid fa-download"></i> Download Again
+                </button>
+                <button class="btn-action-main" id="btn-preview"
+                    style="background: white; color: var(--color-primary); border: 2px solid var(--color-primary);">
+                    <i class="fa-solid fa-map-location-dot"></i> See it in KMZ Viewer
+                </button>
+            </div>
+
+            <div style="margin-top:24px;">
                 <button id="btn-restart"
                     style="background:none; border:none; color:#666; text-decoration:underline; cursor:pointer;">Convert
                     another file</button>

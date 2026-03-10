@@ -232,7 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (polygonsA.length === 0) throw new Error("File A (Source) contains no valid polygons.");
 
             let totalAreaA = 0;
-            polygonsA.forEach(p => { totalAreaA += turf.area(p); });
+            polygonsA.forEach(p => {
+                p._area = turf.area(p);
+                p.bbox = turf.bbox(p);
+                totalAreaA += p._area;
+            });
             totalAreaA = totalAreaA / 1_000_000;
 
             // 2. Parse File B (Target Reference)
@@ -245,7 +249,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalDataLoaded = polygonsB.length; // save before filter
 
             let totalAreaB = 0;
-            polygonsB.forEach(p => { totalAreaB += turf.area(p); });
+            polygonsB.forEach(p => {
+                p._area = turf.area(p);
+                p.bbox = turf.bbox(p);
+                totalAreaB += p._area;
+            });
             totalAreaB = totalAreaB / 1_000_000;
 
             // 2.1 Apply Filter if present
@@ -267,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 updateProgress(35, "Filtering...", `Filtered targets from ${initialCount} down to ${polygonsB.length}`);
 
-                polygonsB.forEach(p => { filteredAreaB += turf.area(p); });
+                polygonsB.forEach(p => { filteredAreaB += p._area; });
                 filteredAreaB = filteredAreaB / 1_000_000;
             }
 
@@ -278,17 +286,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const results = [];
             const total = polygonsB.length;
 
-            // Build Spatial Index for Source (A) to speed up lookups
-            // Simple approach: Pre-calculate BBoxes for A
-            polygonsA.forEach(p => p.bbox = turf.bbox(p));
+            // Build Grid Spatial Index for Source (A)
+            const spatialIdx = buildGridIndex(polygonsA);
 
             // Allow UI updates
-            const chunkSize = 5;
+            const chunkSize = 20;
             for (let i = 0; i < total; i += chunkSize) {
                 const chunk = polygonsB.slice(i, i + chunkSize);
 
                 chunk.forEach(targetPoly => {
-                    const res = processTargetFeature(targetPoly, polygonsA, overlapCol);
+                    const res = processTargetFeature(targetPoly, polygonsA, spatialIdx, overlapCol);
                     results.push(res);
                 });
 
@@ -304,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const blob = generateExcel(results);
 
             // Finish Job
-            const outName = `Overlap_on_${fileB.name}_by_${fileA.name}.xlsx`;
+            const outName = fileB.name.replace(/\.[^/.]+$/, "") + "_Overlap.xlsx";
             JobTracker.finish(jobId, [new File([blob], outName)]);
 
             updateProgress(100, "Done!", "");
@@ -421,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return polys;
     }
 
-    function processTargetFeature(targetFeature, sourceList, overlapCol) {
+    function processTargetFeature(targetFeature, sourceList, spatialIdx, overlapCol) {
         // Prepare base properties from the Target Feature
         const props = { ...targetFeature.properties };
 
@@ -452,20 +459,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const totalAreaSqM = turf.area(targetFeature);
+            const totalAreaSqM = targetFeature._area || turf.area(targetFeature);
             let coveredAreaSqM = 0;
 
-            // Optimization: Filter Source Layer by BBox intersection with Target
-            const targetBbox = turf.bbox(targetFeature);
-            const overlappingSources = sourceList.filter(src => {
-                return !disjointBbox(targetBbox, src.bbox);
-            });
+            // Use pre-computed bbox + spatial index to get candidates
+            const targetBbox = targetFeature.bbox || turf.bbox(targetFeature);
+            const candidateIndices = querySpatialIndex(spatialIdx, targetBbox);
+            const overlappingSources = [...candidateIndices]
+                .map(i => sourceList[i])
+                .filter(src => !disjointBbox(targetBbox, src.bbox));
 
             // Calculate Union of Intersections
             const clips = [];
             overlappingSources.forEach(src => {
                 try {
-                    // Turf v6 syntax: two arguments
                     const intersection = turf.intersect(targetFeature, src);
                     if (intersection) clips.push(intersection);
                 } catch (e) {
@@ -474,15 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (clips.length > 0) {
-                // Union all clips to merge overlapping coverage areas
-                let unionPoly = clips[0];
-                for (let i = 1; i < clips.length; i++) {
-                    try {
-                        // Turf v6 syntax: two arguments
-                        unionPoly = turf.union(unionPoly, clips[i]);
-                    } catch (e) { /* skip bad geometry */ }
-                }
-                coveredAreaSqM = turf.area(unionPoly);
+                coveredAreaSqM = turf.area(unionClips(clips));
             }
 
             // Decimal Fraction (0-1) scale as requested
@@ -518,6 +517,62 @@ document.addEventListener('DOMContentLoaded', () => {
         return b1[2] < b2[0] || b1[0] > b2[2] || b1[3] < b2[1] || b1[1] > b2[3];
     }
 
+    // Grid spatial index — cell size is 2× the median polygon span
+    function buildGridIndex(polygons) {
+        if (!polygons.length) return { index: new Map(), cellSize: 1 };
+        const spans = polygons.map(p => Math.max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]));
+        spans.sort((a, b) => a - b);
+        const median = spans[Math.floor(spans.length / 2)] || 1;
+        const cellSize = Math.max(median * 2, 0.01);
+        const index = new Map();
+        polygons.forEach((poly, i) => {
+            const b = poly.bbox;
+            const x0 = Math.floor(b[0] / cellSize), x1 = Math.floor(b[2] / cellSize);
+            const y0 = Math.floor(b[1] / cellSize), y1 = Math.floor(b[3] / cellSize);
+            for (let x = x0; x <= x1; x++) {
+                for (let y = y0; y <= y1; y++) {
+                    const key = `${x},${y}`;
+                    if (!index.has(key)) index.set(key, []);
+                    index.get(key).push(i);
+                }
+            }
+        });
+        return { index, cellSize };
+    }
+
+    function querySpatialIndex(spatialIdx, bbox) {
+        const { index, cellSize } = spatialIdx;
+        const x0 = Math.floor(bbox[0] / cellSize), x1 = Math.floor(bbox[2] / cellSize);
+        const y0 = Math.floor(bbox[1] / cellSize), y1 = Math.floor(bbox[3] / cellSize);
+        const candidates = new Set();
+        for (let x = x0; x <= x1; x++) {
+            for (let y = y0; y <= y1; y++) {
+                const cell = index.get(`${x},${y}`);
+                if (cell) cell.forEach(i => candidates.add(i));
+            }
+        }
+        return candidates;
+    }
+
+    // Binary-tree union reduction — avoids growing polygon complexity with each sequential merge
+    function unionClips(clips) {
+        if (clips.length === 1) return clips[0];
+        let level = clips;
+        while (level.length > 1) {
+            const next = [];
+            for (let i = 0; i < level.length; i += 2) {
+                if (i + 1 < level.length) {
+                    try { next.push(turf.union(level[i], level[i + 1])); }
+                    catch (e) { next.push(level[i]); }
+                } else {
+                    next.push(level[i]);
+                }
+            }
+            level = next;
+        }
+        return level[0];
+    }
+
     function generateExcel(results) {
         const worksheet = XLSX.utils.json_to_sheet(results);
         resultWorkbook = XLSX.utils.book_new();
@@ -531,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!resultWorkbook) return;
         const nameA = fileA.name.replace(/\.[^/.]+$/, "");
         const nameB = fileB.name.replace(/\.[^/.]+$/, "");
-        XLSX.writeFile(resultWorkbook, `Overlap_on_${nameB}_by_${nameA}.xlsx`);
+        XLSX.writeFile(resultWorkbook, `${nameB}_Overlap.xlsx`);
     }
 
     // --- UI Helpers ---
@@ -690,6 +745,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         html += '</div>';
+
+        const outName = `${fileB.name.replace(/\.[^/.]+$/, "")}_Overlap.xlsx`;
+        html += `
+        <div style="margin-top: 25px; text-align: center;">
+            <div style="font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+                <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+                <span>Output File: <strong style="color: #334155;">${outName}</strong></span>
+            </div>
+        </div>
+        `;
 
         resultSummary.innerHTML = html;
     }

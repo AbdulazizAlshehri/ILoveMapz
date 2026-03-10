@@ -46,47 +46,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function startProcessing() {
+    async function startProcessing() {
         showView(processingView);
         updateProgress(10, 'Initializing calculator...');
 
         const jobId = JobTracker.start('DrivingDistance', [currentFile]);
 
         // Simulate logic
-        setTimeout(() => {
-            try {
-                updateProgress(50, 'Fetching routing data...', `Contacting API... (${1} item(s))`);
+        try {
+            await window.yieldToMain();
 
-                // --- Business Logic Goes Here ---
+            updateProgress(50, 'Fetching routing data...', `Contacting API... (${1} item(s))`);
 
-                updateProgress(90, 'Finalizing matrix...');
+            // --- Business Logic Goes Here ---
 
-                // Mock result
-                generatedBlob = new Blob(["Distance complete"], { type: "text/plain" });
-                generatedName = "Distance_Matrix.xlsx";
+            updateProgress(90, 'Finalizing matrix...');
 
-                JobTracker.finish(jobId, [new File([generatedBlob], generatedName)]);
+            // Mock result
+            generatedBlob = new Blob(["Distance complete"], { type: "text/plain" });
+            generatedName = currentFile.name.replace(/\.[^/.]+$/, "") + "_Distances.xlsx";
 
-                updateProgress(100, 'Done!');
-                if (resultSummary) {
-                    resultSummary.innerHTML = `
-                        <div class="stat-box success">
-                            <span class="stat-value">Matrix</span>
-                            <span class="stat-label">Generated</span>
-                        </div>
-                    `;
-                }
-                showView(resultView);
+            JobTracker.finish(jobId, [new File([generatedBlob], generatedName)]);
 
-                // Auto Download
-                saveAs(generatedBlob, generatedName);
-            } catch (err) {
-                console.error(err);
-                JobTracker.fail(jobId, err.message);
-                alert("Error during routing: " + err.message);
-                resetApp();
+            updateProgress(100, 'Done!');
+            if (resultSummary) {
+                resultSummary.innerHTML = `
+                    <div class="stat-box success">
+                        <span class="stat-value">Matrix</span>
+                        <span class="stat-label">Generated</span>
+                    </div>
+                    <div style="margin-top: 20px; font-size: 14px; color: #64748b; background: #f8f9fa; padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0;">
+                        <i class="fa-solid fa-file-signature" style="color:var(--color-primary);"></i>
+                        <span>Output File: <strong style="color: #334155;">${generatedName}</strong></span>
+                    </div>
+                `;
             }
-        }, 1500);
+            showView(resultView);
+
+            // Auto Download
+            saveAs(generatedBlob, generatedName);
+        } catch (err) {
+            console.error(err);
+            JobTracker.fail(jobId, err.message);
+            alert("Error during routing: " + err.message);
+            resetApp();
+        }
     }
 
     function showView(view) {
